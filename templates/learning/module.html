@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ module.title }} · Learn{% endblock %}
+{% block content %}
+
+<a href="{% url 'learning' %}" class="text-muted text-xs hover:text-accent">← All modules</a>
+<div class="mb-6">
+  <h2 class="text-2xl font-bold mt-2 mb-1 transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">{{ module.title }}</h2>
+  <p class="text-muted text-sm">{{ module.summary }}</p>
+</div>
+
+<article class="bg-panel border border-slate-800 rounded-xl p-6 mb-6 prose prose-invert max-w-none">
+  {{ module.body_html|safe }}
+</article>
+
+{% if module.key_terms %}
+<section class="bg-panel border border-slate-800 rounded-xl p-6 mb-6">
+  <h3 class="font-semibold mb-3">Key Terms</h3>
+  <dl class="text-sm space-y-2">
+  {% for k in module.key_terms %}
+  <div><dt class="font-bold text-accent">{{ k.term }}</dt><dd class="text-slate-300">{{ k.definition }}</dd></div>
+  {% endfor %}
+  </dl>
+</section>
+{% endif %}
+
+{% if module.did_you_know %}
+<section class="bg-panel2 border-l-4 border-accent rounded p-4 mb-6 text-sm">
+  <strong>Did you know?</strong> {{ module.did_you_know }}
+</section>
+{% endif %}
+
+<section class="bg-panel border border-slate-800 rounded-xl p-6">
+  <h3 class="font-semibold mb-3">Quiz · 3 questions</h3>
+  {% if result %}
+  <div class="mb-3 text-lg">You scored <span class="text-accent font-bold">{{ result.correct }}/{{ result.total }}</span>
+    {% if result.correct == result.total %}<span style="margin-left:8px;font-size:13px;color:var(--sa-accent);">🎉 Perfect!</span>{% endif %}
+  </div>
+  {% if result.correct == result.total %}
+  <script>
+    if (window.TradeLabConfetti) setTimeout(window.TradeLabConfetti, 120);
+    if (window.TradeLabToast) setTimeout(function(){ window.TradeLabToast("🎉 Module complete. Onto the next one."); }, 600);
+  </script>
+  {% endif %}
+  {% endif %}
+  <form method="post" action="{% url 'learning_quiz' module.slug %}" class="space-y-4">
+  {% csrf_token %}
+  {% for q in questions %}
+  <div>
+  <p class="font-medium mb-2">{{ forloop.counter }}. {{ q.question }}</p>
+  {% for choice in q.choices %}
+  <label class="block text-sm py-1">
+  <input type="radio" name="q{{ q.id }}" value="{{ forloop.counter0 }}" class="mr-2">{{ choice }}
+  </label>
+  {% endfor %}
+  </div>
+  {% endfor %}
+  <button class="bg-accent text-base font-semibold px-4 py-2 rounded">Submit</button>
+  </form>
+</section>
+
+{% endblock %}

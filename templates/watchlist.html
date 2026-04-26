@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Watchlist · TradeLab{% endblock %}
+{% block content %}
+
+<div class="page-head fade-in">
+  <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">Your <span class="gradient-text">Watchlist</span></h2>
+  <p>Up to 20 NSE stocks. Auto-refreshes every 60 seconds.</p>
+</div>
+
+<form method="post" action="{% url 'watchlist_add' %}" class="flex gap-2 mb-6 max-w-lg" autocomplete="off">
+  {% csrf_token %}
+  <div class="flex-1 relative">
+  <input name="ticker" placeholder="Type a name or ticker e.g. HDFC Bank" required
+  class="w-full bg-panel border border-slate-700 rounded px-3 py-2 font-mono"
+  data-autocomplete="ticker" autocomplete="off" spellcheck="false" />
+  </div>
+  <button class="bg-accent text-base font-semibold px-4 rounded">Add</button>
+</form>
+
+<div class="bg-panel rounded-xl p-5 border border-slate-800 overflow-x-auto">
+  <table class="w-full text-sm">
+  <thead class="text-muted text-xs uppercase">
+  <tr><th class="text-left py-2">Ticker</th><th>Price</th><th>Change</th><th>Alert</th><th></th></tr>
+  </thead>
+  <tbody id="wlBody">
+  {% for it in items %}
+  <tr class="border-t border-slate-800" data-ticker="{{ it.ticker }}">
+  <td class="py-2"><a class="hover:text-accent" href="{% url 'analysis' %}?ticker={{ it.ticker }}">{{ it.ticker }}</a></td>
+  <td class="text-center px-2" data-col="price">…</td>
+  <td class="text-center px-2" data-col="change">…</td>
+  <td class="text-center">{{ it.alert_price|default:"—" }}</td>
+  <td class="text-right">
+  <form method="post" action="{% url 'watchlist_remove' it.ticker %}">{% csrf_token %}
+  <button class="text-danger text-xs">Remove</button>
+  </form>
+  </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="5" class="text-muted py-4 text-center">Nothing on your watchlist yet.</td></tr>
+  {% endfor %}
+  </tbody>
+  </table>
+</div>
+
+<!-- ═══ Grade watchlist (Trade Analyzer) ════════════════════════════════ -->
+{% if items %}
+<div class="bg-panel rounded-xl border border-slate-800 mt-6 p-6">
+  <div class="flex items-baseline justify-between flex-wrap gap-3 mb-2">
+    <div>
+      <h3 class="text-lg font-bold font-display">Grade my Watchlist</h3>
+      <p class="text-xs text-muted mt-0.5">Runs the Trade Analyzer across every ticker here and grades each setup A / B / C (or SKIP). Turns a passive watchlist into a ranked action list.</p>
+    </div>
+    <button id="ta-run" class="bg-accent hover:bg-emerald-400 text-sm font-semibold px-5 py-2 rounded-lg transition">
+      Analyze →
+    </button>
+  </div>
+  <div id="ta-progress" class="text-xs text-muted hidden mt-3">Starting…</div>
+  <div id="ta-results" class="mt-4 space-y-2 hidden"></div>
+</div>
+{% endif %}
+
+<div id="notifs" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  const ALERTS = {
+  {% for it in items %}{% if it.alert_price %}"{{ it.ticker }}": {{ it.alert_price }},{% endif %}{% endfor %}
+  };
+
+  function notify(msg) {
+  const el = document.createElement("div");
+  el.className = "bg-accent text-base px-4 py-2 rounded shadow font-semibold";
+  el.textContent = msg;
+  document.getElementById("notifs").appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+  }
+
+  function refresh() {
+  fetch("/api/watchlist/").then(r => r.json()).then(data => {
+  data.quotes.forEach(q => {
+  const row = document.querySelector(`tr[data-ticker="${q.ticker}"]`);
+  if (!row) return;
+  row.querySelector('[data-col="price"]').textContent = "₹" + q.price;
+  const ch = row.querySelector('[data-col="change"]');
+  ch.textContent = q.change_pct + "%";
+  ch.className = "text-center px-2 " + (q.change_pct >= 0 ? "text-accent" : "text-danger");
+  if (ALERTS[q.ticker] && q.price >= ALERTS[q.ticker]) {
+  notify(`${q.ticker} crossed ₹${ALERTS[q.ticker]}`);
+  }
+  });
+  });
+  }
+  refresh();
+  setInterval(refresh, 60000);
+
+  // ── Grade watchlist via Trade Analyzer SSE ──
+  (function () {
+    const btn = document.getElementById("ta-run");
+    if (!btn) return;
+    const progress = document.getElementById("ta-progress");
+    const results = document.getElementById("ta-results");
+
+    function esc(s) {
+      const d = document.createElement("div"); d.textContent = String(s || ""); return d.innerHTML;
+    }
+
+    function renderTrade(r) {
+      const setup = r.setup || {};
+      const grade = setup.grade || "?";
+      const rr = setup.rr_ratio != null ? setup.rr_ratio.toFixed(2) : "—";
+      const gradeCls = grade === "A" ? "bg-emerald-500/20 text-emerald-400"
+                    : grade === "B" ? "bg-amber-500/20 text-amber-400"
+                    : "bg-slate-500/20 text-slate-300";
+      return `<div class="bg-panel2 rounded-lg border border-slate-700 px-4 py-3 flex items-center gap-4">
+        <span class="px-2.5 py-1 rounded-md text-xs font-bold font-mono ${gradeCls}">GRADE ${grade}</span>
+        <a href="/analysis/?ticker=${esc(r.ticker)}" class="font-mono font-bold hover:text-accent">${esc(r.ticker)}</a>
+        <div class="flex-1 text-xs text-slate-400">R:R <span class="text-slate-200 font-mono">${rr}</span>  ·  ${esc(r.reason || '')}</div>
+      </div>`;
+    }
+
+    function renderSkip(r) {
+      return `<div class="bg-panel2/50 rounded-lg border border-slate-800 px-4 py-2 flex items-center gap-3 opacity-70">
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-slate-700/40 text-slate-400">SKIP</span>
+        <span class="font-mono text-sm text-slate-400">${esc(r.ticker)}</span>
+        <span class="text-xs text-slate-500">${esc(r.reason || '')}</span>
+      </div>`;
+    }
+
+    btn.addEventListener("click", () => {
+      btn.disabled = true; btn.textContent = "Analyzing…";
+      progress.classList.remove("hidden"); progress.textContent = "Starting…";
+      results.classList.add("hidden"); results.innerHTML = "";
+
+      const tickers = Array.from(document.querySelectorAll("tr[data-ticker]"))
+        .map(r => r.dataset.ticker).join(",");
+      const url = "/screener/api/tools/trade_analyzer/stream?tickers=" + encodeURIComponent(tickers);
+      const es = new EventSource(url);
+      const trades = [], skipped = [];
+
+      es.onmessage = (ev) => {
+        let d; try { d = JSON.parse(ev.data); } catch { return; }
+        if (d.type === "progress") {
+          progress.textContent = `Analyzing ${d.ticker}… (${d.idx}/${d.total})${d.cached ? ' · cached' : ''}`;
+        } else if (d.type === "trade") {
+          trades.push(d.result);
+          results.classList.remove("hidden");
+          results.innerHTML = trades.map(renderTrade).join("") + skipped.map(renderSkip).join("");
+        } else if (d.type === "skip") {
+          skipped.push(d.result);
+          results.classList.remove("hidden");
+          results.innerHTML = trades.map(renderTrade).join("") + skipped.map(renderSkip).join("");
+        } else if (d.type === "complete") {
+          es.close();
+          progress.textContent = `Done — ${d.summary.trades} tradeable, ${d.summary.skipped} skipped.`;
+          // Final sorted list from server
+          results.innerHTML = (d.trades || []).map(renderTrade).join("")
+                            + (d.skipped || []).map(renderSkip).join("");
+          btn.disabled = false; btn.textContent = "Re-run →";
+        } else if (d.type === "error") {
+          es.close();
+          progress.textContent = "Error: " + (d.message || "analyzer failed");
+          btn.disabled = false; btn.textContent = "Retry →";
+        }
+      };
+      es.onerror = () => {
+        es.close();
+        progress.textContent = "Connection lost. Try again.";
+        btn.disabled = false; btn.textContent = "Retry →";
+      };
+    });
+  })();
+</script>
+{% endblock %}

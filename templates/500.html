@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Something Broke · TradeLab{% endblock %}
+{% block content %}
+<div style="max-width:620px;margin:60px auto 0;text-align:center;">
+  <div class="eyebrow mb-4" style="color: var(--sa-danger);">500 · Server Error</div>
+  <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2.4rem,5vw,3.6rem);line-height:1;letter-spacing:-0.02em;">
+    Something on our end <span style="background:linear-gradient(135deg,var(--sa-danger),var(--sa-accent2));-webkit-background-clip:text;background-clip:text;color:transparent;">hit a stop loss</span>.
+  </h2>
+  <p style="color:var(--sa-muted);font-size:15px;margin-top:18px;max-width:52ch;margin-left:auto;margin-right:auto;line-height:1.6;">
+    Usually this is yfinance rate-limiting or a flaky data fetch. Refresh in a minute and it'll almost always come back. If it persists, it's worth mentioning to the operator.
+  </p>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:30px;flex-wrap:wrap;">
+    <a href="{% url 'dashboard' %}" style="background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none;">← Dashboard</a>
+    <button onclick="window.location.reload()" style="background:transparent;border:1px solid var(--sa-border2);color:var(--sa-ink);padding:12px 22px;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;">Retry</button>
+  </div>
+  <blockquote style="margin:50px auto 0;padding:16px 22px;border-left:3px solid var(--sa-danger);font-style:italic;color:var(--sa-muted);max-width:50ch;font-size:14px;line-height:1.6;text-align:left;">
+    "In investing, what is comfortable is rarely profitable." — Robert Arnott
+  </blockquote>
+</div>
+{% endblock %}

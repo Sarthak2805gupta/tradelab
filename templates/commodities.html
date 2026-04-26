@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+{% block title %}Commodities · TradeLab{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+  <div class="flex items-baseline justify-between mb-2">
+  <h2 class="text-2xl font-bold transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">Long-Term Commodities Desk</h2>
+  {% if detail %}
+  <a href="{% url 'commodities' %}" class="text-xs text-muted hover:text-accent">← Back to all</a>
+  {% endif %}
+  </div>
+  <p class="text-muted text-sm">Compare ETF vs Futures exposure for metals and energy. Built for retail investors thinking in years, not weeks.
+  </p>
+</div>
+
+{% if not detail %}
+  <!-- Index: cards for each commodity -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {% for row in listing %}
+  {% with primary=row.spec.etf.ticker|default:row.spec.futures.ticker %}
+  <div class="bg-panel border border-slate-800 hover:border-accent rounded-xl p-5 transition group">
+  <a href="{% url 'analysis' %}?ticker={{ primary }}" class="block">
+  <div class="flex items-center justify-between mb-3">
+  <div class="flex items-center gap-3">
+  <span class="text-3xl">{{ row.spec.emoji }}</span>
+  <div>
+  <h3 class="text-lg font-bold group-hover:text-accent">{{ row.spec.name }}</h3>
+  <p class="text-[11px] text-muted">
+  {% if row.spec.etf %}ETF + Futures{% else %}Futures only (no Indian ETF){% endif %}
+  · click for full analysis →
+  </p>
+  </div>
+  </div>
+  </div>
+  <p class="text-xs text-slate-300 leading-relaxed mb-4">{{ row.spec.thesis }}</p>
+  </a>
+  <div class="grid grid-cols-2 gap-3 text-xs">
+  {% if row.spec.etf %}
+  <a href="{% url 'analysis' %}?ticker={{ row.spec.etf.ticker }}"
+  class="bg-panel2 hover:bg-slate-700 border border-transparent hover:border-accent rounded-lg p-3 transition">
+  <div class="text-[10px] uppercase tracking-wider text-muted mb-1">ETF · analyze</div>
+  {% if row.etf_quote %}
+  <div class="font-mono text-white">₹{{ row.etf_quote.price }}</div>
+  <div class="{% if row.etf_quote.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  {{ row.etf_quote.change_pct }}%
+  </div>
+  {% else %}
+  <div class="text-muted italic">— loading —</div>
+  {% endif %}
+  </a>
+  {% else %}
+  <div class="bg-panel2 rounded-lg p-3 opacity-60">
+  <div class="text-[10px] uppercase tracking-wider text-muted mb-1">ETF</div>
+  <div class="text-muted italic">— not available —</div>
+  </div>
+  {% endif %}
+  {% if row.spec.futures %}
+  <a href="{% url 'analysis' %}?ticker={{ row.spec.futures.ticker }}"
+  class="bg-panel2 hover:bg-slate-700 border border-transparent hover:border-accent rounded-lg p-3 transition">
+  <div class="text-[10px] uppercase tracking-wider text-muted mb-1">Futures · analyze</div>
+  {% if row.fut_quote %}
+  <div class="font-mono text-white">{{ row.fut_quote.price }}</div>
+  <div class="{% if row.fut_quote.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  {{ row.fut_quote.change_pct }}%
+  </div>
+  {% else %}
+  <div class="text-muted italic">— loading —</div>
+  {% endif %}
+  </a>
+  {% else %}
+  <div class="bg-panel2 rounded-lg p-3 opacity-60">
+  <div class="text-[10px] uppercase tracking-wider text-muted mb-1">Futures</div>
+  <div class="text-muted italic">— not available —</div>
+  </div>
+  {% endif %}
+  </div>
+  <div class="mt-3 text-right">
+  <a href="?c={{ row.spec.key }}" class="text-[11px] text-muted hover:text-accent">Compare ETF vs Futures →
+  </a>
+  </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+  </div>
+
+  <!-- Educational primer at the bottom of the index -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-6 mt-8">
+  <h3 class="text-lg font-bold mb-3">ETF vs Futures — the 60-second primer</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300">
+  <div>
+  <h4 class="font-semibold text-white mb-1">Commodity ETF</h4>
+  <p class="leading-relaxed">A fund that holds physical metal (or its proxy) and issues units that trade on the
+  stock exchange. You buy units like a share, hold them in your demat, and the unit
+  price tracks the underlying metal minus a small expense ratio. There's no expiry,
+  no leverage, no margin call. Best for someone who wants <em>exposure</em> to gold or
+  silver as part of a portfolio and isn't interested in trading.
+  </p>
+  </div>
+  <div>
+  <h4 class="font-semibold text-white mb-1">Futures Contract</h4>
+  <p class="leading-relaxed">A standardized agreement to buy/sell a fixed quantity at a fixed date. You pay a
+  small margin (5–10% of notional) instead of full price — that's leverage.
+  Every day your position is marked-to-market: gains credit your account, losses
+  debit it. Contracts expire monthly, so to "hold" you must <em>roll over</em> by
+  closing the expiring one and opening the next month — and pay the price difference
+  (the "roll cost"). Best for active traders, hedgers, or short-term tactical bets.
+  </p>
+  </div>
+  </div>
+  <div class="mt-4 p-4 bg-panel2 rounded-lg text-sm text-slate-300">
+  <strong class="text-accent">The short version:</strong> for a long-term retail investor
+  who wants to <em>own</em> a commodity for years, the ETF is almost always the right
+  vehicle. Futures are powerful but they're a different sport — they exist for traders and
+  hedgers, not buyers. Click any commodity above to see a full ETF-vs-Futures breakdown
+  with current market data.
+  </div>
+  </div>
+
+{% else %}
+  <!-- Detail page for a single commodity -->
+  {% with spec=detail.spec rec=detail.recommendation %}
+  <div class="bg-panel border border-slate-800 rounded-xl p-6 mb-6">
+  <div class="flex items-start gap-4 mb-4">
+  <span class="text-5xl">{{ spec.emoji }}</span>
+  <div class="flex-1">
+  <h3 class="text-2xl font-bold">{{ spec.name }}</h3>
+  <p class="text-sm text-slate-300 leading-relaxed mt-2">{{ spec.thesis }}</p>
+  </div>
+  </div>
+
+  <!-- Live quotes side by side (each clickable to full analysis) -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+  {% if spec.etf and detail.etf_quote %}
+  <a href="{% url 'analysis' %}?ticker={{ spec.etf.ticker }}"
+  class="bg-panel2 rounded-lg p-4 border border-slate-700 hover:border-accent transition block">
+  <div class="flex items-center justify-between mb-2">
+  <h4 class="font-semibold">ETF</h4>
+  <span class="text-[10px] uppercase tracking-wider text-accent">Analyze →</span>
+  </div>
+  <div class="font-mono text-xl">₹{{ detail.etf_quote.price }}</div>
+  <div class="{% if detail.etf_quote.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %} text-sm">
+  {{ detail.etf_quote.change }} ({{ detail.etf_quote.change_pct }}%) today
+  </div>
+  <div class="text-xs text-muted mt-2">
+  {{ spec.etf.name }} · <span class="font-mono">{{ spec.etf.ticker }}</span><br>Expense ratio: {{ spec.etf.expense_ratio }}% / yr
+  </div>
+  {% if detail.etf_trend.available %}
+  <div class="text-xs text-muted mt-2">Trend: <span class="text-white">{{ detail.etf_trend.trend }}</span> ·
+  RSI {{ detail.etf_trend.rsi }} · Vol {{ detail.etf_trend.volatility }}
+  </div>
+  {% endif %}
+  </a>
+  {% else %}
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700 opacity-60">
+  <div class="flex items-center justify-between mb-2">
+  <h4 class="font-semibold">ETF</h4>
+  <span class="text-[10px] uppercase tracking-wider text-muted">Spot-tracking fund</span>
+  </div>
+  <div class="text-muted italic">No Indian ETF available for {{ spec.name|lower }}.</div>
+  </div>
+  {% endif %}
+
+  {% if spec.futures and detail.fut_quote %}
+  <a href="{% url 'analysis' %}?ticker={{ spec.futures.ticker }}"
+  class="bg-panel2 rounded-lg p-4 border border-slate-700 hover:border-accent transition block">
+  <div class="flex items-center justify-between mb-2">
+  <h4 class="font-semibold">Futures</h4>
+  <span class="text-[10px] uppercase tracking-wider text-accent">Analyze →</span>
+  </div>
+  <div class="font-mono text-xl">{{ detail.fut_quote.price }}</div>
+  <div class="{% if detail.fut_quote.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %} text-sm">
+  {{ detail.fut_quote.change }} ({{ detail.fut_quote.change_pct }}%) today
+  </div>
+  <div class="text-xs text-muted mt-2">
+  {{ spec.futures.name }} · <span class="font-mono">{{ spec.futures.ticker }}</span><br>Lot size: {{ spec.futures.lot_size }} {{ spec.futures.unit }}
+  </div>
+  {% if detail.fut_trend.available %}
+  <div class="text-xs text-muted mt-2">Trend: <span class="text-white">{{ detail.fut_trend.trend }}</span> ·
+  RSI {{ detail.fut_trend.rsi }} · Vol {{ detail.fut_trend.volatility }}
+  </div>
+  {% endif %}
+  </a>
+  {% else %}
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700 opacity-60">
+  <div class="flex items-center justify-between mb-2">
+  <h4 class="font-semibold">Futures</h4>
+  </div>
+  <div class="text-muted italic">Futures data unavailable.</div>
+  </div>
+  {% endif %}
+  </div>
+  </div>
+
+  <!-- Position sizer: amount + risk -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-6 mb-6">
+  <h3 class="text-lg font-bold mb-1">Position Sizer</h3>
+  <p class="text-xs text-muted mb-4">Tell us how much you can invest and how much loss you can stomach — we'll compute exactly
+  what your money buys in each route and which one fits your risk tolerance.
+  </p>
+  <form method="get" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
+  <input type="hidden" name="c" value="{{ detail.spec.key }}" />
+  <div>
+  <label class="text-xs text-muted block mb-1">Amount to invest (₹)</label>
+  <input name="amount" value="{{ form_amount }}" type="number" min="1" step="any" placeholder="e.g. 100000"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-accent font-mono" />
+  </div>
+  <div>
+  <label class="text-xs text-muted block mb-1">Max loss tolerance (%)</label>
+  <input name="risk" value="{{ form_risk }}" type="number" min="0.1" max="100" step="0.1" placeholder="e.g. 10"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-accent font-mono" />
+  </div>
+  <div class="flex items-end">
+  <button class="bg-accent hover:bg-emerald-400 text-base font-semibold px-5 py-2 rounded-lg transition w-full">Calculate →
+  </button>
+  </div>
+  </form>
+
+  {% if sizer %}
+  <div class="mt-5">
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 border-accent mb-4">
+  <div class="text-xs text-muted">Your inputs</div>
+  <div class="text-sm">Investing <strong>₹{{ sizer.amount|inr }}</strong> ·
+  willing to risk <strong>{{ sizer.risk_pct }}%</strong>
+  (₹{{ sizer.risk_budget|inr }}) ·
+  stress-tested against a {{ sizer.shock_pct|floatformat:0 }}% adverse move.
+  </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+  <!-- ETF plan -->
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="flex items-center justify-between mb-2">
+  <h4 class="font-semibold">ETF Plan</h4>
+  {% if sizer.etf.available %}
+  {% if sizer.etf.fits_risk %}
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent uppercase tracking-wider">Fits</span>
+  {% else %}
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-danger/20 text-danger uppercase tracking-wider">Over budget</span>
+  {% endif %}
+  {% else %}
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-muted uppercase tracking-wider">N/A</span>
+  {% endif %}
+  </div>
+  {% if sizer.etf.available %}
+  <div class="text-2xl font-bold">{{ sizer.etf.units }} units</div>
+  <div class="text-xs text-muted mt-1">@ ₹{{ sizer.etf.price|inr:2 }} each</div>
+  <div class="grid grid-cols-2 gap-2 text-xs mt-3">
+  <div>
+  <div class="text-muted">Deployed</div>
+  <div class="font-mono">₹{{ sizer.etf.deployed|inr }}</div>
+  </div>
+  <div>
+  <div class="text-muted">Cash leftover</div>
+  <div class="font-mono">₹{{ sizer.etf.leftover|inr }}</div>
+  </div>
+  <div>
+  <div class="text-muted">10% shock loss</div>
+  <div class="font-mono {% if sizer.etf.fits_risk %}text-accent{% else %}text-danger{% endif %}">
+  ₹{{ sizer.etf.loss_on_shock|inr }} ({{ sizer.etf.loss_on_shock_pct|floatformat:1 }}%)
+  </div>
+  </div>
+  <div>
+  <div class="text-muted">Margin call risk</div>
+  <div class="font-mono text-accent">None</div>
+  </div>
+  </div>
+  <p class="text-xs text-slate-300 mt-3 leading-relaxed">{{ sizer.etf.explanation }}</p>
+  {% else %}
+  <p class="text-sm text-muted italic">No Indian ETF available for {{ detail.spec.name|lower }}.</p>
+  {% endif %}
+  </div>
+
+  <!-- Futures plan -->
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="flex items-center justify-between mb-2">
+  <h4 class="font-semibold">Futures Plan</h4>
+  {% if sizer.futures.available and sizer.futures.affordable %}
+  {% if sizer.futures.fits_risk %}
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent uppercase tracking-wider">Fits</span>
+  {% else %}
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-danger/20 text-danger uppercase tracking-wider">Over budget</span>
+  {% endif %}
+  {% elif sizer.futures.available %}
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-yellow-400/20 text-yellow-400 uppercase tracking-wider">Too small</span>
+  {% else %}
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-muted uppercase tracking-wider">N/A</span>
+  {% endif %}
+  </div>
+  {% if sizer.futures.available and sizer.futures.affordable %}
+  <div class="text-2xl font-bold">{{ sizer.futures.lots }} lot(s)</div>
+  <div class="text-xs text-muted mt-1">notional ₹{{ sizer.futures.position_notional|inr }}</div>
+  <div class="grid grid-cols-2 gap-2 text-xs mt-3">
+  <div>
+  <div class="text-muted">Margin used</div>
+  <div class="font-mono">₹{{ sizer.futures.margin_used|inr }}</div>
+  </div>
+  <div>
+  <div class="text-muted">Leverage</div>
+  <div class="font-mono">~12.5×</div>
+  </div>
+  <div>
+  <div class="text-muted">10% shock loss</div>
+  <div class="font-mono {% if sizer.futures.fits_risk %}text-accent{% else %}text-danger{% endif %}">
+  ₹{{ sizer.futures.loss_on_shock|inr }} ({{ sizer.futures.loss_on_shock_pct|floatformat:1 }}%)
+  </div>
+  </div>
+  <div>
+  <div class="text-muted">Margin call risk</div>
+  <div class="font-mono text-danger">High</div>
+  </div>
+  </div>
+  <p class="text-xs text-slate-300 mt-3 leading-relaxed">{{ sizer.futures.explanation }}</p>
+  {% elif sizer.futures.available %}
+  <p class="text-sm text-slate-300 leading-relaxed">{{ sizer.futures.explanation }}</p>
+  {% else %}
+  <p class="text-sm text-muted italic">Futures not available.</p>
+  {% endif %}
+  </div>
+  </div>
+
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 border-accent">
+  <div class="text-xs uppercase tracking-wider text-muted mb-1">Recommendation</div>
+  <div class="text-xl font-bold text-accent mb-2">{{ sizer.verdict }}</div>
+  <p class="text-sm text-slate-300 leading-relaxed">{{ sizer.verdict_reason }}</p>
+  </div>
+  </div>
+  {% endif %}
+  </div>
+
+  <!-- Verdict card -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-6 mb-6">
+  <div class="flex items-center justify-between mb-4">
+  <h3 class="text-lg font-bold">The Verdict</h3>
+  <div class="flex gap-2 text-xs">
+  <span class="bg-panel2 px-3 py-1 rounded-full">ETF score: <strong class="text-accent">{{ rec.score_etf }}</strong></span>
+  <span class="bg-panel2 px-3 py-1 rounded-full">Futures score: <strong class="text-yellow-400">{{ rec.score_fut }}</strong></span>
+  </div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-5 border-l-4 border-accent mb-4">
+  <div class="text-2xl font-bold text-accent mb-2">{{ rec.verdict }}</div>
+  <p class="text-sm text-slate-300 leading-relaxed">{{ rec.action }}</p>
+  </div>
+
+  <h4 class="font-semibold mb-3 mt-6">The reasoning, step by step</h4>
+  <ol class="space-y-3 text-sm">
+  {% for r in rec.reasoning %}
+  <li class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="flex items-center justify-between mb-1">
+  <strong class="text-white">{{ forloop.counter }}. {{ r.label }}</strong>
+  <span class="text-[10px] font-mono text-muted">{{ r.delta }}</span>
+  </div>
+  <p class="text-slate-300 leading-relaxed">{{ r.text }}</p>
+  </li>
+  {% endfor %}
+  </ol>
+  </div>
+
+  <!-- Pros & cons grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div class="bg-panel border border-slate-800 rounded-xl p-5">
+  <h4 class="font-bold mb-3 flex items-center gap-2">ETF — Pros & Cons</h4>
+  <div class="text-xs uppercase tracking-wider text-accent mb-1">Pros</div>
+  <ul class="text-sm text-slate-300 space-y-1 list-disc pl-5 mb-4">
+  {% for p in rec.pros_etf %}<li>{{ p }}</li>{% endfor %}
+  </ul>
+  <div class="text-xs uppercase tracking-wider text-danger mb-1">Cons</div>
+  <ul class="text-sm text-slate-300 space-y-1 list-disc pl-5">
+  {% for c in rec.cons_etf %}<li>{{ c }}</li>{% endfor %}
+  </ul>
+  </div>
+
+  <div class="bg-panel border border-slate-800 rounded-xl p-5">
+  <h4 class="font-bold mb-3 flex items-center gap-2">Futures — Pros & Cons</h4>
+  <div class="text-xs uppercase tracking-wider text-accent mb-1">Pros</div>
+  <ul class="text-sm text-slate-300 space-y-1 list-disc pl-5 mb-4">
+  {% for p in rec.pros_fut %}<li>{{ p }}</li>{% endfor %}
+  </ul>
+  <div class="text-xs uppercase tracking-wider text-danger mb-1">Cons</div>
+  <ul class="text-sm text-slate-300 space-y-1 list-disc pl-5">
+  {% for c in rec.cons_fut %}<li>{{ c }}</li>{% endfor %}
+  </ul>
+  </div>
+  </div>
+
+  <!-- How each instrument actually works -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-6 mt-6">
+  <h4 class="font-bold mb-4">How each one actually works</h4>
+  <div class="space-y-5 text-sm text-slate-300 leading-relaxed">
+  <div>
+  <h5 class="text-white font-semibold mb-1">The ETF route</h5>
+  <p>You open your broker app and buy units of <span class="font-mono text-accent">{% if spec.etf %}{{ spec.etf.ticker }}{% else %}(none available){% endif %}</span>
+  just like you'd buy a share. The fund house behind the ETF takes your money,
+  buys the actual underlying ({{ spec.name|lower }} bullion in a vault for metals),
+  and the unit price tracks the spot value of those holdings. You pay a small annual
+  management fee (the expense ratio) which is automatically baked into the unit NAV —
+  no separate bill. When you want to exit, you sell the units on the exchange. That's
+  the entire lifecycle. No expiry, no rollover, no margin, no surprises.
+  </p>
+  </div>
+  <div>
+  <h5 class="text-white font-semibold mb-1">The Futures route</h5>
+  <p>You sign a contract to buy {{ spec.futures.lot_size }} {{ spec.futures.unit }} of
+  {{ spec.name|lower }} on a specific future date at today's agreed price. To enter,
+  you only post a margin (~5–10% of the notional value), so a relatively small amount
+  of capital controls a much larger position — that's leverage cutting both ways.
+  Every single trading day the exchange revalues your position: if the price moved
+  against you, money is debited from your account that evening (mark-to-market).
+  If your account falls below the maintenance margin, you get a margin call and must
+  add money or your position is liquidated. Each contract expires monthly; to keep
+  your exposure you "roll" by closing the expiring contract and opening the next month
+  — and the next month is usually slightly more expensive (contango), so each rollover
+  quietly costs you a fraction of a percent.
+  </p>
+  </div>
+  <div>
+  <h5 class="text-white font-semibold mb-1">What should you do going forward?</h5>
+  <p>
+  {% if rec.has_etf %}
+  Treat {{ spec.name|lower }} as a portfolio diversifier, not a get-rich trade.
+  A typical allocation is 5–10% of your equity portfolio. Build the position
+  through monthly SIPs into the ETF rather than trying to time a single entry —
+  this smooths out the {{ detail.etf_trend.volatility|default:"normal" }} volatility
+  and removes the emotional pressure of "is this the bottom?" Review the allocation
+  once a year and rebalance if it drifts more than ±2% from your target.
+  {% else %}
+  Since there's no clean ETF for {{ spec.name|lower }} on Indian exchanges, your
+  cleanest retail options are: (1) skip direct exposure and play the theme via
+  equities (mining/refining/downstream stocks), or (2) only use futures if you
+  genuinely understand margin, daily MTM, and rollover mechanics — and even then,
+  keep position sizes small enough that a 10% adverse move costs you no more than
+  2% of total capital.
+  {% endif %}
+  </p>
+  </div>
+  </div>
+  </div>
+  {% endwith %}
+{% endif %}
+
+{% endblock %}

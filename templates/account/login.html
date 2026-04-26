@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load socialaccount %}
+{% block title %}Sign in · TradeLab{% endblock %}
+{% block content %}
+
+<style>
+  .auth-wrap { max-width: 440px; margin: 40px auto 0; }
+  .auth-card {
+    background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2));
+    border: 1px solid var(--sa-border);
+    border-radius: 20px; padding: 36px 32px;
+    box-shadow: var(--sa-card-shadow);
+    backdrop-filter: blur(12px);
+  }
+  .auth-card h1 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: 28px; letter-spacing: -0.02em;
+  }
+  .auth-card .sub { color: var(--sa-muted); font-size: 13.5px; margin-top: 6px; }
+  .oauth-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid var(--sa-border2);
+    background: transparent; color: var(--sa-ink);
+    font-weight: 600; font-size: 14px; cursor: pointer;
+    transition: all .15s; text-decoration: none;
+  }
+  .oauth-btn:hover { border-color: var(--sa-accent); background: rgba(255,255,255,0.02); }
+  html.light .oauth-btn:hover { background: rgba(15,23,42,0.02); }
+  .oauth-ic { width: 18px; height: 18px; flex: none; }
+  .divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: var(--sa-muted); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--sa-border2); }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--sa-muted); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid var(--sa-border2);
+    background: var(--sa-panel2); color: var(--sa-ink);
+    font-size: 14px;
+  }
+  .field input:focus { border-color: var(--sa-accent); outline: none; }
+  .primary-btn {
+    width: 100%; padding: 13px; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, var(--sa-accent), #10b981);
+    color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+    transition: transform .15s, filter .15s;
+  }
+  .primary-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .auth-footer { text-align: center; margin-top: 22px; font-size: 13px; color: var(--sa-muted); }
+  .auth-footer a { color: var(--sa-accent); font-weight: 600; }
+  .err { background: rgba(251,113,133,0.1); border: 1px solid rgba(251,113,133,0.3); border-radius: 10px; padding: 10px 12px; color: var(--sa-danger); font-size: 13px; margin-bottom: 14px; }
+</style>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="eyebrow mb-2">Welcome back</div>
+    <h1>Sign in to <span style="background:linear-gradient(135deg,var(--sa-accent),var(--sa-accent2));-webkit-background-clip:text;background-clip:text;color:transparent;">TradeLab</span></h1>
+    <p class="sub">Save watchlists, track your learning progress, and sync across devices.</p>
+
+    {% if any_oauth_configured %}
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:26px;">
+      {% if 'google' in oauth_configured %}
+      <a href="{% provider_login_url 'google' %}" class="oauth-btn">
+        <svg class="oauth-ic" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.2 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.2 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4 5.5l6.3 5.3C41.4 36 44 30.5 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        Continue with Google
+      </a>
+      {% endif %}
+      {% if 'apple' in oauth_configured %}
+      <a href="{% provider_login_url 'apple' %}" class="oauth-btn">
+        <svg class="oauth-ic" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.04c-.03-3.17 2.59-4.7 2.71-4.77-1.48-2.16-3.78-2.46-4.59-2.49-1.95-.2-3.82 1.15-4.81 1.15-1 0-2.52-1.12-4.16-1.09-2.14.03-4.12 1.24-5.23 3.15-2.24 3.88-.57 9.62 1.6 12.77 1.06 1.54 2.31 3.27 3.96 3.21 1.59-.06 2.2-1.03 4.12-1.03 1.92 0 2.47 1.03 4.15 1 1.72-.03 2.81-1.56 3.86-3.11 1.22-1.78 1.72-3.5 1.75-3.59-.04-.02-3.34-1.28-3.37-5.08zM13.97 3.26c.87-1.06 1.46-2.53 1.3-3.99-1.25.05-2.78.84-3.69 1.89-.81.93-1.52 2.42-1.33 3.87 1.4.11 2.84-.71 3.72-1.77z"/></svg>
+        Continue with Apple
+      </a>
+      {% endif %}
+      {% if 'github' in oauth_configured %}
+      <a href="{% provider_login_url 'github' %}" class="oauth-btn">
+        <svg class="oauth-ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3C5.4.3 0 5.7 0 12.3c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.8-1.6 8.2-6.1 8.2-11.4C24 5.7 18.6.3 12 .3z"/></svg>
+        Continue with GitHub
+      </a>
+      {% endif %}
+    </div>
+
+    <div class="divider">or with email</div>
+    {% endif %}
+
+    <form method="post" action="{% url 'account_login' %}">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="err">{{ form.non_field_errors.0 }}</div>{% endif %}
+      <div class="field">
+        <label>Email or username</label>
+        <input type="text" name="login" value="{{ form.login.value|default:'' }}" autofocus required>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" required>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sa-muted);margin-bottom:18px;">
+        <input type="checkbox" name="remember" checked style="width:auto;"> Keep me signed in
+      </label>
+      <button type="submit" class="primary-btn">Sign in</button>
+      {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
+    </form>
+
+    <div class="auth-footer">
+      New here? <a href="{% url 'account_signup' %}">Create an account →</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

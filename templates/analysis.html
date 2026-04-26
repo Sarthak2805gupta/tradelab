@@ -1,0 +1,1219 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Analysis · TradeLab{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+  <h2 class="text-2xl font-bold transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">Analysis Engine</h2>
+  <p class="text-muted text-sm">Indicator-driven verdict with a plain-English breakdown.</p>
+</div>
+
+<form method="get" class="flex gap-2 mb-4 max-w-xl" autocomplete="off">
+  <div class="flex-1 relative">
+  <input id="ticker-input" name="ticker" value="{{ ticker }}" placeholder="Type a name or ticker e.g. Infosys, Reliance, HDFC"
+  class="w-full bg-panel border border-slate-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent font-mono"
+  autocomplete="off" spellcheck="false" data-autocomplete="ticker" />
+  </div>
+  <button class="bg-accent hover:bg-emerald-400 text-base font-semibold px-5 rounded-lg transition">Analyze →</button>
+</form>
+
+{% if ticker %}
+  <a href="{% url 'analysis' %}" class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent mb-6">
+  ← Back to all stocks
+  </a>
+{% else %}
+  <div class="bg-panel border border-slate-800 rounded-xl p-5 mb-6">
+  <div class="flex items-center justify-between mb-3">
+  <h3 class="text-sm font-semibold text-muted uppercase tracking-wider">Quick Pick</h3>
+  <span class="text-xs text-muted">Click to analyze</span>
+  </div>
+  {% for group in quick_picks %}
+  <div class="mb-4 last:mb-0">
+  <div class="text-[10px] uppercase tracking-widest text-muted mb-2 flex items-center gap-2">
+  <span>{{ group.label }}</span>
+  <div class="flex-1 h-px bg-slate-800"></div>
+  </div>
+  <div class="flex flex-wrap gap-2">
+  {% for s in group.stocks %}
+  <a href="{% url 'analysis' %}?ticker={{ s.ticker }}"
+  class="group bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-accent rounded-lg px-3 py-2 text-left transition block">
+  <div class="text-sm font-semibold group-hover:text-accent">{{ s.name }}</div>
+  <div class="text-[10px] text-muted font-mono">{{ s.ticker }}</div>
+  </a>
+  {% endfor %}
+  </div>
+  </div>
+  {% endfor %}
+  </div>
+{% endif %}
+
+{% if ticker and not report.ok %}
+  <div class="bg-panel border border-danger/40 rounded-xl p-6">
+  <h3 class="text-danger font-bold mb-2">404 — Cannot analyze</h3>
+  <p class="text-muted text-sm">{{ report.error }}</p>
+  </div>
+{% elif report.ok %}
+  {{ report|json_script:"pdf-data" }}
+  {{ deep_indicators|json_script:"pdf-deep" }}
+  {{ news|json_script:"pdf-news" }}
+  {{ sizer|json_script:"pdf-sizer" }}
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+    <button type="button" id="dl-pdf-btn"
+            style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;border:none;cursor:pointer;
+                   background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;font-weight:700;font-size:13px;
+                   box-shadow:0 8px 20px -10px rgba(52,211,153,0.6);transition:transform .15s,filter .15s;">
+      <span style="font-size:16px;">📄</span> Download PDF report
+    </button>
+  </div>
+  <div id="pdf-report">
+  {% include "_report_card.html" with report=report %}
+
+  <!-- ═══ Deep Indicator Readings ═══════════════════════════════════════ -->
+  {% if deep_indicators %}
+  <div class="bg-panel rounded-xl border border-slate-800 mt-6 overflow-hidden">
+    <div class="px-6 py-4 border-b border-white/5 flex items-baseline justify-between">
+      <div>
+        <h3 class="text-lg font-bold font-display">Deep Indicators</h3>
+        <p class="text-xs text-muted mt-0.5">Beyond the basics — Supertrend, ADX, Ichimoku, and money-flow readings with plain-English interpretations.</p>
+      </div>
+      <span class="text-[10px] text-muted font-mono uppercase tracking-wider">{{ deep_indicators|length }} signals</span>
+    </div>
+    <div class="divide-y divide-white/5">
+      {% for d in deep_indicators %}
+      <div class="px-6 py-4 flex items-start gap-4">
+        <div class="w-36 flex-shrink-0">
+          <div class="text-xs text-muted uppercase tracking-wider">{{ d.name }}</div>
+          <div class="text-sm font-mono mt-1">{{ d.reading }}</div>
+        </div>
+        <div class="flex-shrink-0 w-40">
+          <span class="px-2 py-1 rounded-full text-[10px] font-bold font-mono
+            {% if d.bullish == True %}bg-emerald-500/15 text-emerald-400
+            {% elif d.bullish == False %}bg-rose-500/15 text-rose-400
+            {% else %}bg-amber-500/15 text-amber-400{% endif %}">
+            {{ d.verdict }}
+          </span>
+        </div>
+        <div class="flex-1 text-sm text-slate-300 leading-relaxed">{{ d.detail }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- News popup (modal) — opened by the cards in the "Latest News" section below -->
+  <div id="news-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.7);">
+    <div class="bg-panel border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative">
+      <button id="news-modal-close" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-panel2 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center">✕</button>
+      <div class="p-6">
+        <div id="news-modal-meta" class="flex items-baseline gap-3 text-[11px] text-muted font-mono mb-3 flex-wrap"></div>
+        <h3 id="news-modal-title" class="font-display font-bold text-xl text-white leading-snug mb-4"></h3>
+        <div class="eyebrow mb-2">Summary · ~60 words</div>
+        <p id="news-modal-summary" class="text-sm text-slate-200 leading-relaxed mb-5"></p>
+        <a id="news-modal-link" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 bg-accent hover:bg-emerald-400 text-base font-semibold text-sm px-4 py-2 rounded-lg transition">
+          Read full article on source →
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Backtest Runner ═══════════════════════════════════════════════ -->
+  <div class="bg-panel rounded-xl border border-slate-800 mt-6 p-6">
+    <div class="flex items-baseline justify-between flex-wrap gap-3 mb-3">
+      <div>
+        <h3 class="text-lg font-bold font-display">Backtest 9 Strategies</h3>
+        <p class="text-xs text-muted mt-0.5">Run this ticker through Triple Confirmation, MACD Momentum, Supertrend, Golden Cross, Ichimoku, Donchian Breakout, Mean Reversion, Parabolic SAR, and HMA Momentum.</p>
+      </div>
+      <button id="bt-run" class="bg-accent hover:bg-emerald-400 text-sm font-semibold px-5 py-2 rounded-lg transition">
+        Run Backtest →
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-3 text-xs mb-4">
+      <label class="text-muted">Period
+        <select id="bt-period" class="bg-panel2 border border-slate-700 rounded-md px-2 py-1 ml-1 font-mono">
+          <option>1y</option><option selected>3y</option><option>5y</option>
+        </select>
+      </label>
+      <label class="text-muted">Capital ₹
+        <input id="bt-capital" type="number" value="100000" step="10000" min="1000"
+               class="bg-panel2 border border-slate-700 rounded-md px-2 py-1 ml-1 font-mono w-32" />
+      </label>
+      <label class="text-muted">Stop-loss %
+        <input id="bt-sl" type="number" value="5" step="0.5" min="0.5" max="20"
+               class="bg-panel2 border border-slate-700 rounded-md px-2 py-1 ml-1 font-mono w-16" />
+      </label>
+      <label class="text-muted">Take-profit %
+        <input id="bt-tp" type="number" value="10" step="1" min="1" max="50"
+               class="bg-panel2 border border-slate-700 rounded-md px-2 py-1 ml-1 font-mono w-16" />
+      </label>
+    </div>
+    <div id="bt-status" class="text-xs text-muted hidden">Running 9 strategies — this usually takes 10-20 seconds…</div>
+    <div id="bt-results" class="hidden">
+      <div class="text-xs text-muted mb-2"><span id="bt-range"></span></div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs font-mono">
+          <thead class="text-muted uppercase">
+            <tr>
+              <th class="text-left py-2 pr-3">Strategy</th>
+              <th class="text-right pr-3">Return</th>
+              <th class="text-right pr-3">Sharpe</th>
+              <th class="text-right pr-3">Win %</th>
+              <th class="text-right pr-3">Trades</th>
+              <th class="text-right pr-3">Max DD</th>
+            </tr>
+          </thead>
+          <tbody id="bt-tbody"></tbody>
+        </table>
+      </div>
+      <p id="bt-best" class="text-xs text-muted mt-3"></p>
+    </div>
+  </div>
+
+  <!-- Per-stock position sizer -->
+  <div class="bg-panel rounded-xl p-6 border border-slate-800 mt-6">
+  <h3 class="text-lg font-bold mb-1">Position Sizer for {{ ticker }}</h3>
+  <p class="text-xs text-muted mb-4">How much should you actually put into this stock? Tell us your budget and how much loss
+  you can stomach — we'll size the position against this stock's recent volatility.
+  </p>
+  <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+  <input type="hidden" name="ticker" value="{{ ticker }}" />
+  <div>
+  <label class="text-xs text-muted block mb-1">Amount to invest (₹)</label>
+  <input name="amount" value="{{ form_amount }}" type="number" min="1" step="any" placeholder="e.g. 50000"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-accent font-mono" />
+  </div>
+  <div>
+  <label class="text-xs text-muted block mb-1">Max loss tolerance (%)</label>
+  <input name="risk" value="{{ form_risk }}" type="number" min="0.1" max="100" step="0.1" placeholder="e.g. 10"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-accent font-mono" />
+  </div>
+  <div>
+    <label class="text-xs text-muted block mb-1">Time frame</label>
+    <div class="relative" id="tf-wrap-analysis">
+      <input type="hidden" name="timeframe" id="tf-hidden-analysis" value="{{ form_timeframe }}" />
+      <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
+        class="w-full flex items-center justify-between bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm hover:border-emerald-500 transition" id="tf-display-analysis">
+        <span>{% for key, spec in timeframes.items %}{% if form_timeframe == key %}{{ spec.label }}{% endif %}{% endfor %}</span>
+        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div class="hidden absolute z-30 left-0 right-0 top-full mt-1 bg-panel2 border border-slate-700 rounded-lg shadow-2xl overflow-hidden">
+        {% for key, spec in timeframes.items %}
+          <button type="button" onclick="document.getElementById('tf-hidden-analysis').value='{{ key }}';document.querySelector('#tf-display-analysis span').textContent='{{ spec.label }}';this.closest('.relative').querySelector('.hidden')||this.parentElement.classList.add('hidden');this.parentElement.classList.add('hidden')"
+            class="w-full text-left px-3 py-2 text-sm font-mono hover:bg-emerald-500/10 hover:text-emerald-400 transition {% if form_timeframe == key %}text-emerald-400 bg-emerald-500/5{% else %}text-slate-300{% endif %}">
+            {{ spec.label }}
+          </button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="flex items-end">
+  <button class="bg-accent hover:bg-emerald-400 text-base font-semibold px-5 py-2 rounded-lg transition w-full">Size it →
+  </button>
+  </div>
+  </form>
+
+  {% if sizer %}
+  {% if sizer.ok %}
+  <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-xs text-muted uppercase tracking-wider mb-1">Position</div>
+  <div class="text-2xl font-bold">{{ sizer.units }} shares</div>
+  <div class="text-xs text-muted mt-1">@ ₹{{ sizer.price|inr:2 }} each</div>
+  <div class="text-xs mt-3 space-y-1">
+  <div><span class="text-muted">Deployed:</span> <span class="font-mono">₹{{ sizer.deployed|inr }}</span></div>
+  <div><span class="text-muted">Cash leftover:</span> <span class="font-mono">₹{{ sizer.leftover|inr }}</span></div>
+  </div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-xs text-muted uppercase tracking-wider mb-1">Est. {{ sizer.timeframe_label }} downside</div>
+  <div class="text-2xl font-bold {% if sizer.fits_risk %}text-accent{% else %}text-danger{% endif %}">
+  {{ sizer.expected_loss_pct }}%
+  </div>
+  <div class="text-xs text-muted mt-1">~₹{{ sizer.expected_loss_rs|inr }} loss</div>
+  <div class="text-xs text-muted mt-3">Stock's own volatility: {{ sizer.downside_pct }}% / {{ sizer.timeframe_label|lower }}
+  </div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 {% if sizer.fits_risk %}border-accent{% else %}border-danger{% endif %}">
+  <div class="text-xs text-muted uppercase tracking-wider mb-1">Verdict</div>
+  <div class="text-2xl font-bold {% if sizer.fits_risk %}text-accent{% else %}text-danger{% endif %}">
+  {{ sizer.verdict }}
+  </div>
+  {% if sizer.safe_units %}
+  <div class="text-xs text-muted mt-2">Safe size: {{ sizer.safe_units }} shares (₹{{ sizer.safe_capital|inr }})</div>
+  {% endif %}
+  </div>
+  </div>
+  <p class="text-sm text-slate-300 leading-relaxed mt-4">{{ sizer.verdict_text }}</p>
+  {% else %}
+  <div class="mt-5 bg-panel2 rounded-lg p-4 border-l-4 border-danger">
+  <div class="text-sm font-bold text-danger mb-1">Can't size this position</div>
+  <p class="text-sm text-slate-300">{{ sizer.explanation }}</p>
+  </div>
+  {% endif %}
+  {% endif %}
+  </div>
+
+  <!-- Chart section -->
+  <div class="bg-panel rounded-2xl border border-white/5 mt-6 overflow-hidden shadow-lg">
+    <!-- Toolbar -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 flex-wrap gap-4">
+      <div class="flex items-center gap-4">
+        <h3 class="font-display font-semibold text-white text-sm">{{ ticker }}</h3>
+        <!-- Chart type -->
+        <div class="flex bg-black/20 rounded-lg p-0.5" id="chartTypeBtns">
+          <button data-type="candle" class="chart-type-btn px-3 py-1 rounded-md text-[11px] font-semibold transition-all bg-white/10 text-white">Candles</button>
+          <button data-type="line" class="chart-type-btn px-3 py-1 rounded-md text-[11px] font-semibold transition-all text-slate-500 hover:text-slate-300">Line</button>
+          <button data-type="area" class="chart-type-btn px-3 py-1 rounded-md text-[11px] font-semibold transition-all text-slate-500 hover:text-slate-300">Area</button>
+          <button data-type="bar" class="chart-type-btn px-3 py-1 rounded-md text-[11px] font-semibold transition-all text-slate-500 hover:text-slate-300">Bars</button>
+        </div>
+      </div>
+      <!-- Timeframe -->
+      <div class="flex bg-black/20 rounded-lg p-0.5" id="periodBtns">
+        <button data-p="1d" data-i="5m" class="tf-btn px-3 py-1 rounded-md text-[11px] font-bold transition-all bg-emerald-500/20 text-emerald-400">1D</button>
+        <button data-p="5d" data-i="15m" class="tf-btn px-3 py-1 rounded-md text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300">5D</button>
+        <button data-p="1mo" data-i="1d" class="tf-btn px-3 py-1 rounded-md text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300">1M</button>
+        <button data-p="3mo" data-i="1d" class="tf-btn px-3 py-1 rounded-md text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300">3M</button>
+        <button data-p="6mo" data-i="1d" class="tf-btn px-3 py-1 rounded-md text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300">6M</button>
+        <button data-p="1y" data-i="1d" class="tf-btn px-3 py-1 rounded-md text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300">1Y</button>
+        <button data-p="5y" data-i="1wk" class="tf-btn px-3 py-1 rounded-md text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300">5Y</button>
+      </div>
+      <!-- Share controls -->
+      <div style="display:flex;gap:6px;">
+        <button type="button" id="dl-chart-btn" title="Download chart as image"
+                style="padding:6px 10px;border-radius:8px;border:1px solid var(--sa-border2);background:transparent;color:var(--sa-muted);font-size:11px;font-weight:600;cursor:pointer;">
+          ⬇ PNG
+        </button>
+        <button type="button" id="share-link-btn" title="Share this page"
+                style="padding:6px 10px;border-radius:8px;border:1px solid var(--sa-border2);background:transparent;color:var(--sa-muted);font-size:11px;font-weight:600;cursor:pointer;">
+          🔗 Share
+        </button>
+        <a id="wa-share-btn" href="#" target="_blank" rel="noopener" title="Send to WhatsApp"
+           style="padding:6px 10px;border-radius:8px;border:1px solid var(--sa-border2);background:transparent;color:var(--sa-muted);font-size:11px;font-weight:600;text-decoration:none;">
+          💬 WhatsApp
+        </a>
+      </div>
+    </div>
+    <script>
+    (function () {
+      var ticker = "{{ ticker|escapejs }}";
+      // Build a WhatsApp prefilled share URL.
+      // Works both on mobile (opens the app) and desktop (opens WhatsApp Web).
+      function buildShare() {
+        var url = window.location.href;
+        var txt = "Check out " + ticker + " on TradeLab — " + url;
+        return "https://wa.me/?text=" + encodeURIComponent(txt);
+      }
+      var wa = document.getElementById("wa-share-btn");
+      if (wa) wa.href = buildShare();
+
+      // Copy-link button with Web Share API fallback
+      document.getElementById("share-link-btn").addEventListener("click", async function () {
+        var data = { title: "TradeLab — " + ticker, text: ticker + " analysis on TradeLab", url: window.location.href };
+        if (navigator.share) {
+          try { await navigator.share(data); return; } catch (_) {}
+        }
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          if (window.TradeLabToast) window.TradeLabToast("Link copied — paste in WhatsApp");
+        } catch (_) {
+          prompt("Copy this link:", window.location.href);
+        }
+      });
+
+      // Download the chart as PNG. Our native chart uses a <canvas> inside #chart.
+      document.getElementById("dl-chart-btn").addEventListener("click", function () {
+        var canvas = document.querySelector("#chart canvas");
+        if (!canvas) { if (window.TradeLabToast) window.TradeLabToast("Chart not ready yet"); return; }
+        try {
+          var a = document.createElement("a");
+          a.href = canvas.toDataURL("image/png");
+          a.download = ticker + "_tradelab.png";
+          document.body.appendChild(a); a.click(); a.remove();
+          if (window.TradeLabToast) window.TradeLabToast("Saved — share it on WhatsApp");
+        } catch (e) {
+          if (window.TradeLabToast) window.TradeLabToast("Couldn't save: " + e.message);
+        }
+      });
+    })();
+    </script>
+
+    <!-- Chart sentiment summary — updates per timeframe -->
+    <div id="chart-summary" class="px-6 py-3 border-b border-white/5 hidden">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span id="cs-badge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
+        <span id="cs-text" class="text-sm text-slate-300"></span>
+      </div>
+      <div id="cs-reasons" class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-slate-400"></div>
+    </div>
+
+    <!-- Price chart -->
+    <div id="chart" class="w-full" style="height: 480px;"></div>
+
+    <!-- Volume — compact bar at the bottom -->
+    <div id="volume-chart" class="w-full border-t border-white/5" style="height: 80px;"></div>
+  </div>
+{% endif %}
+
+{% if news %}
+<section class="card p-6 mt-6">
+  <div class="flex items-baseline justify-between mb-4 flex-wrap gap-2">
+    <div>
+      <div class="eyebrow mb-1">Latest News</div>
+      <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;">What's being said about {{ ticker }}</h3>
+    </div>
+    <div class="text-xs" style="color: var(--sa-muted);">via Yahoo Finance · cached 30 min</div>
+  </div>
+  {{ news|json_script:"news-data" }}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    {% for n in news %}
+      <button type="button" data-news-idx="{{ forloop.counter0 }}"
+         class="card-hover spotlight p-4 flex gap-3 items-start text-left w-full" style="border:1px solid var(--sa-border);border-radius:14px;background:transparent;cursor:pointer;color:inherit;font:inherit;"
+         onmousemove="this.style.setProperty('--mx',event.offsetX+'px');this.style.setProperty('--my',event.offsetY+'px');">
+        {% if n.thumb %}<img src="{{ n.thumb }}" alt="" style="width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none;">{% endif %}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:13.5px;line-height:1.35;color:var(--sa-ink);">{{ n.title }}</div>
+          <div class="text-xs mt-2" style="color:var(--sa-muted);display:flex;gap:10px;flex-wrap:wrap;">
+            <span>{{ n.publisher|default:"Unknown source" }}</span>
+          </div>
+        </div>
+      </button>
+    {% endfor %}
+  </div>
+</section>
+
+<script>
+(function () {
+  var dataEl = document.getElementById("news-data");
+  if (!dataEl) return;
+  var items = [];
+  try { items = JSON.parse(dataEl.textContent || "[]"); } catch (_) { return; }
+  var modal = document.getElementById("news-modal");
+  if (!modal) return;
+  var modalMeta    = document.getElementById("news-modal-meta");
+  var modalTitle   = document.getElementById("news-modal-title");
+  var modalSummary = document.getElementById("news-modal-summary");
+  var modalLink    = document.getElementById("news-modal-link");
+  var modalClose   = document.getElementById("news-modal-close");
+
+  // Trim or expand a synopsis to ~60-100 words. Falls back to the title if empty.
+  function pickSummary(item) {
+    var raw = (item.synopsis || "").replace(/\s+/g, " ").trim();
+    if (!raw) {
+      return "No summary was provided by the source for this article. Click 'Read full article' below to view the full story on the publisher's site.";
+    }
+    var words = raw.split(" ");
+    if (words.length <= 100) return raw;
+    var trimmed = words.slice(0, 100).join(" ");
+    if (!/[.!?]$/.test(trimmed)) trimmed += "...";
+    return trimmed;
+  }
+
+  function fmtTime(t) {
+    if (!t) return "";
+    var d = new Date(typeof t === "number" ? t * 1000 : t);
+    if (isNaN(d.getTime())) return String(t);
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  function open(item) {
+    modalMeta.innerHTML =
+      '<span>' + (item.publisher || "Unknown source") + '</span>' +
+      (item.time ? '<span>' + fmtTime(item.time) + '</span>' : '');
+    modalTitle.textContent = item.title || "";
+    modalSummary.textContent = pickSummary(item);
+    if (item.link) {
+      modalLink.href = item.link;
+      modalLink.style.display = "";
+    } else {
+      modalLink.style.display = "none";
+    }
+    modal.classList.remove("hidden");
+  }
+  function close() { modal.classList.add("hidden"); }
+
+  document.querySelectorAll("[data-news-idx]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var i = parseInt(btn.getAttribute("data-news-idx"), 10);
+      if (items[i]) open(items[i]);
+    });
+  });
+  if (modalClose) modalClose.addEventListener("click", close);
+  modal.addEventListener("click", function (e) { if (e.target === modal) close(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) close();
+  });
+})();
+</script>
+{% endif %}
+
+{% if report.ok %}</div><!-- /#pdf-report -->
+
+<script>
+(function () {
+  var btn = document.getElementById("dl-pdf-btn"); if (!btn) return;
+
+  var report = {};
+  var deep = [];
+  var news = [];
+  var sizer = null;
+  try { report = JSON.parse(document.getElementById("pdf-data").textContent || "{}"); } catch (_) {}
+  try { deep = JSON.parse(document.getElementById("pdf-deep").textContent || "[]"); } catch (_) {}
+  try { news = JSON.parse(document.getElementById("pdf-news").textContent || "[]"); } catch (_) {}
+  try { sizer = JSON.parse(document.getElementById("pdf-sizer").textContent || "null"); } catch (_) {}
+
+  function fmtIN(n, dp) {
+    if (n == null || isNaN(n)) return "-";
+    return Number(n).toLocaleString("en-IN", { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 });
+  }
+  function fmtRs(n, dp) { return n == null || isNaN(n) ? "-" : "Rs " + fmtIN(n, dp == null ? 2 : dp); }
+  function fmtPct(n, dp) { return n == null || isNaN(n) ? "-" : (n >= 0 ? "+" : "") + Number(n).toFixed(dp == null ? 1 : dp) + "%"; }
+  // Helvetica in jsPDF only ships WinAnsi glyphs — non-Latin chars (₹, em-dash,
+  // smart quotes, etc.) confuse splitTextToSize and produce mangled wide-spaced
+  // output. Strip / replace them before any text() / splitTextToSize() call.
+  function pdfSafe(s) {
+    if (s == null) return "";
+    return String(s)
+      .replace(/[₹]/g, "Rs ")
+      .replace(/[—–]/g, "-")
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/[•]/g, "-")
+      .replace(/[…]/g, "...")
+      .replace(/[ ]/g, " ")
+      .replace(/[^\x20-\x7E\n]/g, ""); // drop anything left outside printable ASCII
+  }
+
+  function loadJsPDF() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+      s.onload = res; s.onerror = function () { rej(new Error("Could not load jsPDF (check your network)")); };
+      document.head.appendChild(s);
+    });
+  }
+
+  btn.addEventListener("click", async function () {
+    var orig = btn.innerHTML;
+    btn.innerHTML = "⏳ Building your report…"; btn.disabled = true;
+    try {
+      await loadJsPDF();
+      var jsPDF = window.jspdf.jsPDF;
+      var pdf = new jsPDF("p", "mm", "a4");
+      var pageW = pdf.internal.pageSize.getWidth();   // 210
+      var pageH = pdf.internal.pageSize.getHeight();  // 297
+      var M = 14;                                      // page margin
+      var W = pageW - M * 2;
+
+      // Colors
+      var C = {
+        ink:   [230, 235, 243],
+        muted: [138, 148, 167],
+        dim:   [180, 190, 210],
+        bg:    [11, 15, 23],
+        bgLite:[17, 23, 38],
+        accent:[52, 211, 153],
+        warn:  [251, 191, 36],
+        dang:  [251, 113, 133],
+        line:  [40, 50, 72],
+      };
+      function fill(c) { pdf.setFillColor(c[0], c[1], c[2]); }
+      function stroke(c) { pdf.setDrawColor(c[0], c[1], c[2]); }
+      function ink(c) { pdf.setTextColor(c[0], c[1], c[2]); }
+
+      // Current Y cursor on content pages
+      var y = 0;
+      var pageNum = 0;
+
+      // ── Gradient bar helper (fake gradient via stripes) ──
+      function gradientBar(x, yy, w, h) {
+        var steps = 60;
+        for (var i = 0; i < steps; i++) {
+          var t = i / steps;
+          var r = Math.round(52  + (251-52)  * t);
+          var g = Math.round(211 + (191-211) * t);
+          var b = Math.round(153 + (36 -153) * t);
+          pdf.setFillColor(r, g, b);
+          pdf.rect(x + (w / steps) * i, yy, (w / steps) + 0.2, h, "F");
+        }
+      }
+
+      // ── Background + header for a content page ──
+      function paintBg() {
+        fill(C.bg); pdf.rect(0, 0, pageW, pageH, "F");
+      }
+
+      function drawHeader() {
+        gradientBar(0, 0, pageW, 2);
+        fill(C.bgLite); pdf.rect(0, 2, pageW, 12, "F");
+        ink(C.ink);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
+        pdf.text("₹tradeLab  ·  " + (report.ticker || ""), M, 10);
+        ink(C.muted);
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(8);
+        pdf.text(dateStr + " IST", pageW - M, 10, { align: "right" });
+      }
+      function drawFooter() {
+        stroke(C.line); pdf.setLineWidth(0.2);
+        pdf.line(M, pageH - 9, pageW - M, pageH - 9);
+        ink(C.muted);
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(8);
+        pdf.text("Not investment advice · Generated by TradeLab", M, pageH - 4);
+        pdf.text("Page " + pageNum, pageW - M, pageH - 4, { align: "right" });
+      }
+      function newContentPage() {
+        if (pageNum > 0) pdf.addPage();
+        pageNum++;
+        paintBg();
+        drawHeader();
+        drawFooter();
+        y = 22;
+      }
+      function ensureRoom(mmNeeded) {
+        if (y + mmNeeded > pageH - 15) newContentPage();
+      }
+
+      // ── Pretty section heading ──
+      function sectionTitle(txt) {
+        ensureRoom(14);
+        fill(C.accent); pdf.rect(M, y, 3, 7, "F");
+        ink(C.ink);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(14);
+        pdf.text(txt, M + 6, y + 5.5);
+        y += 11;
+      }
+
+      function kvRow(k, v, color) {
+        ensureRoom(7);
+        ink(C.muted);
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
+        pdf.text(k, M, y);
+        ink(color || C.ink);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
+        pdf.text(String(v), pageW - M, y, { align: "right" });
+        y += 6;
+        stroke(C.line); pdf.setLineWidth(0.15);
+        pdf.line(M, y, pageW - M, y);
+        y += 2;
+      }
+
+      function paragraph(txt, opts) {
+        if (!txt) return;
+        opts = opts || {};
+        ink(opts.color || C.dim);
+        pdf.setFont("helvetica", opts.italic ? "italic" : "normal");
+        pdf.setFontSize(opts.size || 10);
+        var lines = pdf.splitTextToSize(String(txt), W);
+        ensureRoom(lines.length * (opts.lh || 4.6) + 2);
+        for (var i = 0; i < lines.length; i++) {
+          pdf.text(lines[i], M, y);
+          y += opts.lh || 4.6;
+        }
+        y += 2;
+      }
+
+      function bullet(txt, color) {
+        ink(color || C.accent);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
+        ensureRoom(6);
+        pdf.text("•", M, y);
+        ink(C.dim);
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+        var lines = pdf.splitTextToSize(String(txt), W - 5);
+        for (var i = 0; i < lines.length; i++) {
+          if (i > 0) { ensureRoom(4.6); }
+          pdf.text(lines[i], M + 5, y);
+          y += 4.6;
+        }
+        y += 1.5;
+      }
+
+      // ── Metadata ──
+      var now = new Date();
+      var dateStr = now.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      var ticker = report.ticker || "UNKNOWN";
+      var name = report.name || ticker;
+      var quote = report.quote || {};
+      var fund  = report.fundamentals || {};
+      var ind   = report.indicators || {};
+      var profile = report.profile || {};
+      var reasons = Array.isArray(report.reasons) ? report.reasons : [];
+
+      // ═══════════════════ MINIMAL PLAIN PAGE ═══════════════════
+      // Pure white background, black text. Nothing decorative. Only sections that
+      // actually have data are drawn — never any blank labels or "—" placeholders.
+      pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, pageW, pageH, "F");
+      pdf.setTextColor(0, 0, 0);
+
+      // 1) Company name + ticker
+      pdf.setFont("helvetica", "bold"); pdf.setFontSize(22);
+      var displayTicker = pdfSafe(ticker.replace(/\.NS$|\.BO$/, ""));
+      pdf.text(displayTicker, M, 28);
+      pdf.setFont("helvetica", "normal"); pdf.setFontSize(12);
+      var nameLines = pdf.splitTextToSize(pdfSafe(name), W);
+      pdf.text(nameLines.slice(0, 2), M, 36);
+
+      pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
+      pdf.text(pdfSafe(dateStr) + " IST", pageW - M, 28, { align: "right" });
+
+      pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.4);
+      pdf.line(M, 48, pageW - M, 48);
+
+      var yy = 60;
+
+      // 2) Price
+      if (quote.price != null) {
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+        pdf.text("Last price", M, yy);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(20);
+        var priceTxt = "Rs " + fmtIN(quote.price, 2);
+        if (quote.change_pct != null) {
+          var cp = Number(quote.change_pct);
+          priceTxt += "   (" + (cp >= 0 ? "+" : "") + cp.toFixed(2) + "%)";
+        }
+        pdf.text(priceTxt, M, yy + 9);
+        yy += 22;
+      }
+
+      // 3) Action + reasons
+      var actionTxt = pdfSafe(String(report.action || "").toUpperCase().trim());
+      if (actionTxt) {
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+        pdf.text("Recommendation", M, yy);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(16);
+        pdf.text(actionTxt, M, yy + 8);
+        yy += 16;
+      }
+
+      var allReasons = reasons.slice();
+      var br = report.buy_rating || {};
+      if (br.tier_description) allReasons.unshift(br.tier_description);
+      if (allReasons.length) {
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+        pdf.text("Why", M, yy); yy += 6;
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+        for (var ri = 0; ri < allReasons.length; ri++) {
+          var rTxt = pdfSafe(allReasons[ri]).trim();
+          if (!rTxt) continue;
+          var ls = pdf.splitTextToSize("- " + rTxt, W);
+          for (var li = 0; li < ls.length; li++) {
+            if (yy > pageH - 90) break;
+            pdf.text(ls[li], M, yy); yy += 5.2;
+          }
+          yy += 1.5;
+        }
+      }
+
+      // 4) 1-month candle chart
+      yy += 4;
+      pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
+      pdf.text("1-month price action", M, yy); yy += 4;
+      var chartTop = yy;
+      var chartH = Math.min(95, pageH - chartTop - 18);
+      var chartLeft = M;
+      var chartRight = pageW - M;
+
+      // Try to fetch 1mo daily bars and draw candles
+      try {
+        var resp = await fetch("/api/history/" + encodeURIComponent(ticker) + "/?period=1mo&interval=1d");
+        if (resp.ok) {
+          var data = await resp.json();
+          var bars = (data && data.bars) || data || [];
+          if (Array.isArray(bars) && bars.length) {
+            // Find min/max
+            var hi = -Infinity, lo = Infinity;
+            for (var bi = 0; bi < bars.length; bi++) {
+              var b = bars[bi];
+              if (b.high != null && b.high > hi) hi = b.high;
+              if (b.low  != null && b.low  < lo) lo = b.low;
+            }
+            if (hi > lo) {
+              var pad = (hi - lo) * 0.06; hi += pad; lo -= pad;
+              var n = bars.length;
+              var plotW = chartRight - chartLeft - 14; // leave room for price labels on right
+              var plotH = chartH;
+              var step = plotW / n;
+              var bodyW = Math.max(1.2, step * 0.55);
+
+              // axes / grid
+              pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.15);
+              for (var g = 0; g <= 4; g++) {
+                var gy = chartTop + (plotH / 4) * g;
+                pdf.line(chartLeft, gy, chartLeft + plotW, gy);
+                pdf.setFontSize(7); pdf.setTextColor(120, 120, 120);
+                var gp = hi - ((hi - lo) / 4) * g;
+                pdf.text("Rs " + fmtIN(gp, 2), chartLeft + plotW + 1.5, gy + 1.4);
+              }
+              pdf.setTextColor(0, 0, 0);
+
+              function priceY(p) { return chartTop + (1 - (p - lo) / (hi - lo)) * plotH; }
+
+              for (var i = 0; i < n; i++) {
+                var bar = bars[i];
+                if (bar.open == null || bar.close == null || bar.high == null || bar.low == null) continue;
+                var x = chartLeft + step * i + step / 2;
+                var bullish = bar.close >= bar.open;
+                if (bullish) { pdf.setFillColor(16, 185, 129); pdf.setDrawColor(16, 185, 129); }
+                else         { pdf.setFillColor(244, 63, 94);  pdf.setDrawColor(244, 63, 94); }
+                // wick
+                pdf.setLineWidth(0.4);
+                pdf.line(x, priceY(bar.high), x, priceY(bar.low));
+                // body
+                var yOpen = priceY(bar.open), yClose = priceY(bar.close);
+                var top = Math.min(yOpen, yClose), h = Math.max(0.6, Math.abs(yOpen - yClose));
+                pdf.rect(x - bodyW / 2, top, bodyW, h, "F");
+              }
+
+              // x-axis date labels: first & last bar
+              pdf.setFontSize(7); pdf.setTextColor(120, 120, 120);
+              function fmtBarDate(b) {
+                if (b == null) return "";
+                var t = b.time || b.date;
+                if (!t) return "";
+                var dd = new Date(typeof t === "number" ? t * 1000 : t);
+                if (isNaN(dd.getTime())) return "";
+                return dd.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+              }
+              pdf.text(fmtBarDate(bars[0]), chartLeft, chartTop + plotH + 4);
+              pdf.text(fmtBarDate(bars[n - 1]), chartLeft + plotW, chartTop + plotH + 4, { align: "right" });
+              pdf.setTextColor(0, 0, 0);
+
+              yy = chartTop + plotH + 10;
+            } else {
+              pdf.setFontSize(9); pdf.setTextColor(120, 120, 120);
+              pdf.text("Chart unavailable - flat price range.", M, chartTop + 6);
+              yy = chartTop + 14;
+            }
+          } else {
+            pdf.setFontSize(9); pdf.setTextColor(120, 120, 120);
+            pdf.text("Chart unavailable - no price history returned.", M, chartTop + 6);
+            yy = chartTop + 14;
+          }
+        } else {
+          pdf.setFontSize(9); pdf.setTextColor(120, 120, 120);
+          pdf.text("Chart unavailable - history request failed.", M, chartTop + 6);
+          yy = chartTop + 14;
+        }
+      } catch (chartErr) {
+        pdf.setFontSize(9); pdf.setTextColor(120, 120, 120);
+        pdf.text("Chart unavailable - " + (chartErr.message || "error fetching data") + ".", M, chartTop + 6);
+        yy = chartTop + 14;
+      }
+
+      // Footer
+      pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.2);
+      pdf.line(M, pageH - 12, pageW - M, pageH - 12);
+      pdf.setTextColor(120, 120, 120); pdf.setFont("helvetica", "italic"); pdf.setFontSize(8);
+      pdf.text("Not investment advice. Generated by TradeLab. Always do your own research.", M, pageH - 6);
+
+      // — Save —
+      pdf.save(ticker.replace(/\.[A-Z]+$/, "") + "_tradelab_report.pdf");
+      if (window.TradeLabToast) window.TradeLabToast("Report saved — share it away");
+    } catch (e) {
+      console.error(e);
+      if (window.TradeLabToast) window.TradeLabToast("Couldn't build PDF: " + (e.message || "error"));
+      alert("PDF generation failed: " + (e.message || "unknown error") + "\n\nCheck the browser console for details.");
+    } finally {
+      btn.innerHTML = orig; btn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if report.ok %}
+<style>
+  /* Hide TradingView attribution / branding overlay on Lightweight Charts */
+  #chart a[href*="tradingview.com"], #volume-chart a[href*="tradingview.com"],
+  #chart [id^="tv-attr"], #volume-chart [id^="tv-attr"] { display: none !important; }
+</style>
+<script src="{% static 'js/tradelab-chart.js' %}"></script>
+<script>
+(function () {
+  const ticker = "{{ ticker|escapejs }}";
+  const UP = "#10b981", DOWN = "#f43f5e", BG = "#0c1017";
+
+  function istTick(ts, type) {
+    const d = new Date(ts * 1000), o = { timeZone: "Asia/Kolkata" };
+    if (type >= 3) return d.toLocaleTimeString("en-IN", { ...o, hour: "2-digit", minute: "2-digit", hour12: false });
+    if (type === 2) return d.toLocaleDateString("en-IN", { ...o, day: "2-digit", month: "short" });
+    if (type === 1) return d.toLocaleDateString("en-IN", { ...o, month: "short", year: "numeric" });
+    return d.toLocaleDateString("en-IN", { ...o, year: "numeric" });
+  }
+
+  // ---- Price chart ----
+  const chartEl = document.getElementById("chart");
+  const priceChart = LightweightCharts.createChart(chartEl, {
+    layout: {
+      background: { type: "solid", color: BG },
+      textColor: "#64748b",
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: 11,
+      attributionLogo: false,
+    },
+    grid: {
+      vertLines: { visible: false },
+      horzLines: { color: "rgba(255,255,255,0.04)", style: 0 },
+    },
+    crosshair: {
+      mode: 0,
+      vertLine: { color: "rgba(255,255,255,0.15)", width: 1, style: 2, labelBackgroundColor: "#1e293b" },
+      horzLine: { color: "rgba(255,255,255,0.15)", width: 1, style: 2, labelBackgroundColor: "#1e293b" },
+    },
+    rightPriceScale: {
+      borderVisible: false,
+      scaleMargins: { top: 0.08, bottom: 0.08 },
+    },
+    timeScale: {
+      timeVisible: true, secondsVisible: false,
+      borderVisible: false,
+      tickMarkFormatter: istTick,
+      rightOffset: 5,
+    },
+    localization: {
+      locale: "en-IN",
+      timeFormatter: ts => new Date(ts * 1000).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false
+      }),
+      priceFormatter: p => "₹" + p.toFixed(2),
+    },
+    width: chartEl.clientWidth,
+    height: 480,
+    handleScroll: { mouseWheel: true, pressedMouseMove: true },
+    handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+  });
+
+  // ---- Volume chart ----
+  const volEl = document.getElementById("volume-chart");
+  const volChart = LightweightCharts.createChart(volEl, {
+    layout: { background: { type: "solid", color: BG }, textColor: "#475569", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, attributionLogo: false },
+    grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+    rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.15, bottom: 0 } },
+    timeScale: { visible: false },
+    crosshair: { mode: 0, vertLine: { visible: false }, horzLine: { visible: false } },
+    width: volEl.clientWidth,
+    height: 80,
+  });
+  const volSeries = volChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "vol" });
+
+  // Sync scroll
+  priceChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) volChart.timeScale().setVisibleLogicalRange(r); });
+  volChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) priceChart.timeScale().setVisibleLogicalRange(r); });
+
+  // ---- Series management ----
+  let activeSeries = null;
+  let activeType = "candle";
+  let lastBars = [];
+
+  function removeSeries() {
+    if (activeSeries) {
+      try { priceChart.removeSeries(activeSeries); } catch(e) {}
+      activeSeries = null;
+    }
+  }
+
+  function createSeries(type) {
+    removeSeries();
+    activeType = type;
+    switch (type) {
+      case "candle":
+        activeSeries = priceChart.addCandlestickSeries({
+          upColor: UP, downColor: DOWN,
+          borderUpColor: UP, borderDownColor: DOWN,
+          wickUpColor: "rgba(16,185,129,0.6)", wickDownColor: "rgba(244,63,94,0.6)",
+        });
+        break;
+      case "line":
+        activeSeries = priceChart.addLineSeries({
+          color: UP, lineWidth: 2, crosshairMarkerRadius: 4,
+        });
+        break;
+      case "area":
+        activeSeries = priceChart.addAreaSeries({
+          lineColor: UP, lineWidth: 2,
+          topColor: "rgba(16,185,129,0.28)", bottomColor: "rgba(16,185,129,0.01)",
+          crosshairMarkerRadius: 4,
+        });
+        break;
+      case "bar":
+        activeSeries = priceChart.addBarSeries({
+          upColor: UP, downColor: DOWN, thinBars: false,
+        });
+        break;
+    }
+    return activeSeries;
+  }
+
+  let currentPeriod = "1d";
+
+  function setData(bars) {
+    lastBars = bars;
+    if (!activeSeries) createSeries(activeType);
+    if (activeType === "line" || activeType === "area") {
+      activeSeries.setData(bars.map(b => ({ time: b.time, value: b.close })));
+    } else {
+      activeSeries.setData(bars.map(b => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
+    }
+    // Volume — muted so it doesn't compete with price
+    volSeries.setData(bars.map(b => ({
+      time: b.time,
+      value: b.volume,
+      color: b.close >= b.open ? "rgba(16,185,129,0.25)" : "rgba(244,63,94,0.25)",
+    })));
+
+    // Annotate intraday charts with event markers
+    if (currentPeriod === "1d" || currentPeriod === "5d") {
+      annotateChart(bars);
+    } else {
+      activeSeries.setMarkers([]);
+    }
+
+    priceChart.timeScale().fitContent();
+    volChart.timeScale().fitContent();
+  }
+
+  // ---- Intraday annotations (clean: only high, low, and biggest move) ----
+  function annotateChart(bars) {
+    if (!bars.length || activeType === "line" || activeType === "area") {
+      try { activeSeries.setMarkers([]); } catch(e) {}
+      return;
+    }
+    const markers = [];
+    const avgVol = bars.reduce((s, b) => s + b.volume, 0) / bars.length;
+
+    // Day high + low
+    let hi = -Infinity, lo = Infinity, hiIdx = 0, loIdx = 0;
+    bars.forEach((b, i) => {
+      if (b.high > hi) { hi = b.high; hiIdx = i; }
+      if (b.low < lo) { lo = b.low; loIdx = i; }
+    });
+
+    // Biggest single-bar move
+    let best = { abs: 0, pct: 0, idx: -1 };
+    bars.forEach((b, i) => {
+      if (i === 0) return;
+      const m = ((b.close - b.open) / b.open) * 100;
+      if (Math.abs(m) > best.abs) best = { abs: Math.abs(m), pct: m, idx: i };
+    });
+
+    if (hiIdx > 0 && hiIdx < bars.length - 1) {
+      markers.push({
+        time: bars[hiIdx].time, position: "aboveBar", color: UP, shape: "arrowDown",
+        text: "Day high ₹" + hi.toFixed(2),
+      });
+    }
+    if (loIdx > 0 && loIdx < bars.length - 1 && loIdx !== hiIdx) {
+      markers.push({
+        time: bars[loIdx].time, position: "belowBar", color: DOWN, shape: "arrowUp",
+        text: "Day low ₹" + lo.toFixed(2),
+      });
+    }
+    if (best.idx > 0 && best.abs > 0.3 && best.idx !== hiIdx && best.idx !== loIdx) {
+      const b = bars[best.idx];
+      const up = best.pct > 0;
+      markers.push({
+        time: b.time,
+        position: up ? "belowBar" : "aboveBar",
+        color: up ? UP : DOWN,
+        shape: "circle",
+        text: (up ? "+" : "") + best.pct.toFixed(1) + "% — " +
+          (b.volume > avgVol * 2 ? "heavy volume" : "normal volume"),
+      });
+    }
+
+    markers.sort((a, b) => a.time - b.time);
+    activeSeries.setMarkers(markers);
+  }
+
+  createSeries("candle");
+
+  // ---- Chart sentiment analysis ----
+  function analyseSentiment(bars) {
+    const el = document.getElementById("chart-summary");
+    const badge = document.getElementById("cs-badge");
+    const text = document.getElementById("cs-text");
+    const reasons = document.getElementById("cs-reasons");
+    if (!bars.length || bars.length < 5) { el.classList.add("hidden"); return; }
+
+    const first = bars[0], last = bars[bars.length - 1];
+    const changePct = ((last.close - first.open) / first.open * 100);
+    const pts = [];
+
+    // 1. Overall direction
+    if (changePct > 0) pts.push({ text: "Price up " + changePct.toFixed(1) + "% over this period", bull: true });
+    else pts.push({ text: "Price down " + Math.abs(changePct).toFixed(1) + "% over this period", bull: false });
+
+    // 2. Close vs range position
+    let hi = -Infinity, lo = Infinity;
+    bars.forEach(b => { if (b.high > hi) hi = b.high; if (b.low < lo) lo = b.low; });
+    const rangePos = (last.close - lo) / (hi - lo || 1);
+    if (rangePos > 0.75) pts.push({ text: "Closing near the high — strength", bull: true });
+    else if (rangePos < 0.25) pts.push({ text: "Closing near the low — weakness", bull: false });
+    else pts.push({ text: "Closing mid-range — undecided", bull: null });
+
+    // 3. Trend: compare first-half avg vs second-half avg
+    const mid = Math.floor(bars.length / 2);
+    const avgFirst = bars.slice(0, mid).reduce((s, b) => s + b.close, 0) / mid;
+    const avgSecond = bars.slice(mid).reduce((s, b) => s + b.close, 0) / (bars.length - mid);
+    if (avgSecond > avgFirst * 1.005) pts.push({ text: "Second half stronger than first — momentum building", bull: true });
+    else if (avgSecond < avgFirst * 0.995) pts.push({ text: "Second half weaker — momentum fading", bull: false });
+
+    // 4. Volume trend
+    const volFirst = bars.slice(0, mid).reduce((s, b) => s + b.volume, 0) / mid;
+    const volSecond = bars.slice(mid).reduce((s, b) => s + b.volume, 0) / (bars.length - mid);
+    if (volSecond > volFirst * 1.3 && changePct > 0) pts.push({ text: "Volume rising with price — confirms the rally", bull: true });
+    else if (volSecond > volFirst * 1.3 && changePct < 0) pts.push({ text: "Volume rising as price falls — selling pressure real", bull: false });
+    else if (volSecond < volFirst * 0.7 && changePct > 0) pts.push({ text: "Volume drying up on the rally — move may not last", bull: false });
+
+    // 5. Green vs red candle count
+    let green = 0, red = 0;
+    bars.forEach(b => { if (b.close >= b.open) green++; else red++; });
+    const greenPct = (green / bars.length * 100).toFixed(0);
+    if (green > red * 1.5) pts.push({ text: greenPct + "% of candles are green — buyers dominant", bull: true });
+    else if (red > green * 1.5) pts.push({ text: (100 - greenPct) + "% of candles are red — sellers dominant", bull: false });
+
+    // Score
+    let score = 0;
+    pts.forEach(p => { if (p.bull === true) score++; else if (p.bull === false) score--; });
+
+    let label, cls;
+    if (score >= 2) { label = "BULLISH"; cls = "bg-emerald-500/20 text-emerald-400"; }
+    else if (score <= -2) { label = "BEARISH"; cls = "bg-rose-500/20 text-rose-400"; }
+    else { label = "NEUTRAL"; cls = "bg-amber-500/20 text-amber-400"; }
+
+    badge.className = "px-3 py-1 rounded-full text-xs font-bold " + cls;
+    badge.textContent = label;
+
+    const tfLabel = currentPeriod === "1d" ? "today" : currentPeriod === "5d" ? "this week" :
+      currentPeriod === "1mo" ? "this month" : currentPeriod === "3mo" ? "last 3 months" :
+      currentPeriod === "6mo" ? "last 6 months" : currentPeriod === "1y" ? "this year" : "this period";
+    text.textContent = label === "BULLISH"
+      ? "The chart is leaning bullish for " + tfLabel + " — here's why:"
+      : label === "BEARISH"
+      ? "The chart is leaning bearish for " + tfLabel + " — here's why:"
+      : "Mixed signals for " + tfLabel + " — no clear direction:";
+
+    reasons.innerHTML = pts.map(p =>
+      '<span class="flex items-center gap-1.5">' +
+      '<span class="w-1.5 h-1.5 rounded-full ' +
+        (p.bull === true ? 'bg-emerald-400' : p.bull === false ? 'bg-rose-400' : 'bg-amber-400') +
+      '"></span>' + p.text + '</span>'
+    ).join("");
+
+    el.classList.remove("hidden");
+  }
+
+  // ---- Load data ----
+  function load(period, interval) {
+    currentPeriod = period;
+    fetch(`/api/history/${encodeURIComponent(ticker)}/?period=${period}&interval=${interval}`)
+      .then(r => r.json())
+      .then(d => { setData(d.bars || []); analyseSentiment(d.bars || []); })
+      .catch(() => {});
+  }
+  load("1d", "5m");
+
+  // ---- Timeframe pills ----
+  document.querySelectorAll("#periodBtns .tf-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#periodBtns .tf-btn").forEach(x => {
+        x.classList.remove("bg-emerald-500/20", "text-emerald-400");
+        x.classList.add("text-slate-400");
+      });
+      btn.classList.remove("text-slate-400");
+      btn.classList.add("bg-emerald-500/20", "text-emerald-400");
+      load(btn.dataset.p, btn.dataset.i);
+    });
+  });
+
+  // ---- Chart type switcher ----
+  document.querySelectorAll("#chartTypeBtns .chart-type-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#chartTypeBtns .chart-type-btn").forEach(x => {
+        x.classList.remove("bg-slate-700", "text-white");
+        x.classList.add("text-slate-400");
+      });
+      btn.classList.remove("text-slate-400");
+      btn.classList.add("bg-slate-700", "text-white");
+      createSeries(btn.dataset.type);
+      if (lastBars.length) setData(lastBars);
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    priceChart.applyOptions({ width: chartEl.clientWidth });
+    volChart.applyOptions({ width: volEl.clientWidth });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  const ticker = "{{ ticker|escapejs }}";
+  const btn = document.getElementById("bt-run");
+  if (!btn) return;
+  const status = document.getElementById("bt-status");
+  const results = document.getElementById("bt-results");
+  const tbody = document.getElementById("bt-tbody");
+  const range = document.getElementById("bt-range");
+  const best = document.getElementById("bt-best");
+
+  function csrf() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : "";
+  }
+
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Running…";
+    status.classList.remove("hidden");
+    results.classList.add("hidden");
+    try {
+      const res = await fetch("/screener/api/backtest/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+        body: JSON.stringify({
+          ticker,
+          period: document.getElementById("bt-period").value,
+          capital: parseInt(document.getElementById("bt-capital").value || "100000"),
+          stop_loss: parseFloat(document.getElementById("bt-sl").value || "5"),
+          take_profit: parseFloat(document.getElementById("bt-tp").value || "10"),
+        }),
+      });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.error || "Backtest failed");
+      range.textContent = `${d.date_range}  ·  ${d.total_days} days  ·  starting capital ₹${d.capital.toLocaleString("en-IN")}`;
+      tbody.innerHTML = d.metrics.map(m => {
+        const retCls = (m["Return %"] || 0) > 0 ? "text-emerald-400" : "text-rose-400";
+        return `<tr class="border-t border-white/5">
+          <td class="py-2 pr-3 text-slate-200">${escapeHtml(m.Strategy)}</td>
+          <td class="text-right pr-3 ${retCls}">${(m["Return %"] ?? 0).toFixed(1)}%</td>
+          <td class="text-right pr-3 text-slate-300">${(m["Sharpe Ratio"] ?? 0).toFixed(2)}</td>
+          <td class="text-right pr-3 text-slate-300">${(m["Win Rate %"] ?? 0).toFixed(0)}%</td>
+          <td class="text-right pr-3 text-slate-400">${m["Total Trades"] ?? 0}</td>
+          <td class="text-right pr-3 text-rose-400">${(m["Max Drawdown %"] ?? 0).toFixed(1)}%</td>
+        </tr>`;
+      }).join("");
+      best.textContent = `Best total return: ${d.best_return}  ·  Best risk-adjusted: ${d.best_sharpe}`;
+      results.classList.remove("hidden");
+    } catch (e) {
+      status.textContent = "Backtest failed: " + e.message;
+    } finally {
+      status.classList.add("hidden");
+      btn.disabled = false;
+      btn.textContent = "Run Backtest →";
+    }
+  });
+
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = String(s || "");
+    return d.innerHTML;
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

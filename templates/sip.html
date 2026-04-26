@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}SIP Calculator · TradeLab{% endblock %}
+{% block content %}
+
+<div class="page-head fade-in">
+  <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">
+    Will your SIP <span class="gradient-text">actually get you there</span>?
+  </h2>
+  <p>Most SIP calculators give you one confident-looking number. We run 2,000 realistic simulations of the Nifty and show you the honest range — what's likely, what's the worst case, what's the best case.</p>
+</div>
+
+<form method="get" class="card p-5 md:p-6 mb-6">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div>
+      <label class="eyebrow block mb-1.5">Monthly investment (₹)</label>
+      <input type="number" name="monthly" min="100" step="100" value="{{ monthly|default:'5000' }}" required>
+    </div>
+    <div>
+      <label class="eyebrow block mb-1.5">For how many years?</label>
+      <input type="number" name="years" min="1" max="50" value="{{ years|default:'15' }}" required>
+    </div>
+    <div>
+      <label class="eyebrow block mb-1.5">Goal (optional, ₹)</label>
+      <input type="number" name="goal" min="0" step="1000" value="{{ goal }}" placeholder="e.g. 3000000">
+    </div>
+    <div style="display:flex;align-items:flex-end;">
+      <button type="submit" style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">
+        Simulate ↩
+      </button>
+    </div>
+  </div>
+</form>
+
+{% if error %}
+<div class="card p-5 mb-6" style="border-color: rgba(251,113,133,0.4);">
+  <div class="eyebrow mb-1" style="color: var(--sa-danger);">Couldn't compute</div>
+  <div style="font-size:14px;">{{ error }}</div>
+</div>
+{% endif %}
+
+{% if result %}
+<div class="card card-hover spotlight p-6 md:p-8 mb-6 fade-in"
+     onmousemove="this.style.setProperty('--mx',event.offsetX+'px');this.style.setProperty('--my',event.offsetY+'px');">
+  <div class="eyebrow mb-2">Investing ₹{{ result.monthly|inr }}/month for {{ result.years }} years</div>
+  <div style="display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;">
+    <div>
+      <div class="text-xs" style="color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.12em;">Total invested</div>
+      <div class="num-big text-3xl mt-1">₹{{ result.invested }}</div>
+    </div>
+    <div>
+      <div class="text-xs" style="color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.12em;">Most likely (50th percentile)</div>
+      <div class="gradient-text" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2rem,4vw,3rem);line-height:1;">
+        ₹{{ result.p50 }}
+      </div>
+      <div class="text-xs mt-1" style="color:var(--sa-muted);">{{ result.p50_mult }}× your contributions</div>
+    </div>
+    {% if result.prob_goal is not None %}
+    <div>
+      <div class="text-xs" style="color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.12em;">Chance you hit ₹{{ result.goal|inr }}</div>
+      <div class="num-big text-3xl {% if result.prob_goal >= 60 %}text-accent{% elif result.prob_goal >= 40 %}{% else %}text-danger{% endif %}">
+        {{ result.prob_goal }}%
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- The bands -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 stagger">
+  <div class="card card-hover p-5">
+    <div class="eyebrow mb-2" style="color: var(--sa-danger);">Worst case — 5th percentile</div>
+    <div class="num-big text-2xl">₹{{ result.p5 }}</div>
+    <div class="text-xs mt-2" style="color:var(--sa-muted);line-height:1.5;">
+      Only 5% of simulations end up below this. Even in nasty decades (think lost decades like 1995–2005), you'd likely end up with at least this much.
+    </div>
+  </div>
+  <div class="card card-hover p-5" style="border-color: rgba(52,211,153,0.35);">
+    <div class="eyebrow mb-2" style="color: var(--sa-accent);">Most likely — median</div>
+    <div class="num-big text-2xl text-accent">₹{{ result.p50 }}</div>
+    <div class="text-xs mt-2" style="color:var(--sa-muted);line-height:1.5;">
+      Half of simulations land here or higher. This is the honest "plan around it" number.
+    </div>
+  </div>
+  <div class="card card-hover p-5">
+    <div class="eyebrow mb-2">Best case — 95th percentile</div>
+    <div class="num-big text-2xl">₹{{ result.p95 }}</div>
+    <div class="text-xs mt-2" style="color:var(--sa-muted);line-height:1.5;">
+      Only 5% of simulations reach this. Don't plan around the best case — but don't be surprised if the next decade is good.
+    </div>
+  </div>
+</div>
+
+<div class="card p-5" style="border-color: rgba(96,165,250,0.3); background: linear-gradient(135deg, rgba(96,165,250,0.08), transparent);">
+  <div class="eyebrow mb-1" style="color: #60a5fa;">How this works</div>
+  <p style="font-size:13.5px;line-height:1.65;color:var(--sa-ink);">
+    We ran <strong>{{ result.sims }} simulated futures</strong>, each using Nifty's historical long-term averages (~12% annual return, 18% annual volatility). In every simulated month, your SIP contribution goes in and gets multiplied by a random monthly return drawn from that distribution. After {{ result.years }} years × 12 months, we record the final portfolio value. The three numbers above are the bottom-5%, middle, and top-5% outcomes.
+  </p>
+  <p style="font-size:12px;line-height:1.55;color:var(--sa-muted);margin-top:10px;">
+    This assumes long-term averages hold. Real markets can have decade-long deviations. It's a plausibility tool, not a guarantee.
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}

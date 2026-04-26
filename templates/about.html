@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block title %}About · TradeLab{% endblock %}
+{% block content %}
+
+<style>
+  .hero-blob {
+    position: absolute; pointer-events: none;
+    width: 500px; height: 500px; border-radius: 50%;
+    filter: blur(80px); opacity: 0.25;
+    z-index: -1;
+  }
+  .hero-blob.b1 { background: var(--sa-accent);  top: -140px; right: -80px; }
+  .hero-blob.b2 { background: var(--sa-accent2); bottom: -160px; left: -100px; opacity: 0.18; }
+  @keyframes float1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-30px, 40px); } }
+  @keyframes float2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(40px, -30px); } }
+  .hero-blob.b1 { animation: float1 18s ease-in-out infinite; }
+  .hero-blob.b2 { animation: float2 22s ease-in-out infinite; }
+
+  .metric-tile {
+    border: 1px solid var(--sa-border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    background: linear-gradient(180deg, var(--sa-card-bg) 0%, var(--sa-card-bg2) 100%);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    position: relative; overflow: hidden;
+    transition: transform .25s, border-color .25s;
+  }
+  .metric-tile:hover { transform: translateY(-3px); border-color: var(--sa-border2); }
+  .metric-tile .v {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-weight: 700; font-size: 44px; line-height: 1;
+    background: linear-gradient(135deg, var(--sa-accent), var(--sa-accent2));
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+  }
+  .metric-tile .l { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--sa-muted); margin-top: 8px; }
+  .metric-tile .s { font-size: 12px; color: var(--sa-muted); margin-top: 4px; line-height: 1.45; }
+
+  .tab-row { display: flex; gap: 4px; padding: 5px; border-radius: 14px;
+    background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2));
+    border: 1px solid var(--sa-border); backdrop-filter: blur(12px); width: fit-content; }
+  .a-tab { padding: 8px 18px; border-radius: 10px; background: transparent;
+    border: none; color: var(--sa-muted); font-weight: 600; font-size: 13px; cursor: pointer;
+    transition: color .15s, background .15s; }
+  .a-tab:hover { color: var(--sa-ink); }
+  .a-tab.on { color: var(--sa-accent); background: rgba(52,211,153,0.12);
+    box-shadow: 0 0 0 1px rgba(52,211,153,0.2); }
+
+  .a-pane { display: none; animation: pane-in .35s cubic-bezier(.2,.8,.2,1); }
+  .a-pane.on { display: block; }
+  @keyframes pane-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .feature-tile {
+    background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2));
+    border: 1px solid var(--sa-border);
+    border-radius: 14px; padding: 18px 20px;
+    transition: transform .2s, border-color .2s;
+    position: relative; overflow: hidden;
+  }
+  .feature-tile::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(52,211,153,0.08), transparent 40%);
+    opacity: 0; transition: opacity .2s;
+    pointer-events: none;
+  }
+  .feature-tile:hover { border-color: var(--sa-border2); transform: translateY(-2px); }
+  .feature-tile:hover::after { opacity: 1; }
+  .feature-tile .t { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; color: var(--sa-ink); }
+  .feature-tile .d { font-size: 12.5px; color: var(--sa-muted); margin-top: 6px; line-height: 1.5; }
+
+  .principle {
+    display: flex; gap: 18px; padding: 18px 20px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2));
+    border: 1px solid var(--sa-border);
+    transition: border-color .2s;
+  }
+  .principle:hover { border-color: var(--sa-accent); }
+  .principle .num {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: 34px; color: var(--sa-accent); line-height: 1;
+    min-width: 48px;
+    background: linear-gradient(135deg, var(--sa-accent), var(--sa-accent2));
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+  }
+
+  .tech-pill {
+    padding: 7px 14px; border-radius: 999px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--sa-border2);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--sa-ink);
+    transition: all .15s; cursor: default;
+  }
+  .tech-pill:hover { border-color: var(--sa-accent); color: var(--sa-accent); transform: translateY(-1px); }
+  html.light .tech-pill { background: rgba(15,23,42,0.03); }
+
+  .flow-step {
+    flex: 1; min-width: 160px;
+    padding: 16px; border-radius: 14px; text-align: center;
+    border: 1px solid var(--sa-border);
+    background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2));
+  }
+  .flow-step .n { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; color: var(--sa-accent); }
+  .flow-step .t { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; margin-top: 6px; }
+  .flow-step .d { font-size: 12px; color: var(--sa-muted); margin-top: 4px; line-height: 1.5; }
+  .flow-arrow { color: var(--sa-muted); font-size: 20px; display: flex; align-items: center; justify-content: center; }
+
+  @media (max-width: 780px) {
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+
+<div style="position: relative; overflow: hidden; border-radius: 24px; padding: 48px 28px 52px; margin-bottom: 40px; border: 1px solid var(--sa-border); background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2)); backdrop-filter: blur(12px);">
+  <div class="hero-blob b1"></div>
+  <div class="hero-blob b2"></div>
+
+  <div class="eyebrow mb-3">About TradeLab</div>
+  <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block"
+      style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: clamp(2.2rem, 5vw, 4.2rem); line-height: 0.95; letter-spacing: -0.02em;">
+    A serious desk for the<br><span style="background: linear-gradient(135deg, var(--sa-accent), var(--sa-accent2)); -webkit-background-clip: text; background-clip: text; color: transparent;">curious retail investor.</span>
+  </h2>
+  <p style="color: var(--sa-muted); font-size: 16px; margin-top: 22px; max-width: 62ch; line-height: 1.65;">
+    TradeLab blends live Indian-market data, technical indicators, fundamentals, and
+    position-sizing math into a single interface aimed at
+    <span style="color: var(--sa-ink); font-weight: 500;">learning</span> and
+    <span style="color: var(--sa-ink); font-weight: 500;">disciplined decision-making</span> — not trading execution.
+  </p>
+</div>
+
+<!-- Live counting metrics -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+  <div class="metric-tile">
+    <div class="v" data-count="200">0</div>
+    <div class="l">Stocks tracked</div>
+    <div class="s">Nifty 50 · 100 · 500 with sector tags</div>
+  </div>
+  <div class="metric-tile">
+    <div class="v" data-count="113">0</div>
+    <div class="l">Encyclopedia entries</div>
+    <div class="s">Indicators · strategies · glossary</div>
+  </div>
+  <div class="metric-tile">
+    <div class="v" data-count="10">0</div>
+    <div class="l">Learning modules</div>
+    <div class="s">From NSE basics to options</div>
+  </div>
+  <div class="metric-tile">
+    <div class="v" data-count="9">0</div>
+    <div class="l">Backtest strategies</div>
+    <div class="s">Comparable side-by-side</div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-row mb-6">
+  <button class="a-tab on" data-pane="what">What's inside</button>
+  <button class="a-tab"    data-pane="how">How it works</button>
+  <button class="a-tab"    data-pane="why">Philosophy</button>
+  <button class="a-tab"    data-pane="tech">Engine room</button>
+  <button class="a-tab"    data-pane="safe">Safety</button>
+</div>
+
+<!-- Pane: what's inside -->
+<div class="a-pane on" id="pane-what">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="features">
+    <a class="feature-tile" href="{% url 'dashboard' %}" style="text-decoration:none">
+      <div class="t">Dashboard</div>
+      <div class="d">Live indices, top movers, gold/silver ETF quotes, portfolio snapshot.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'live' %}" style="text-decoration:none">
+      <div class="t">Live / Day Trade</div>
+      <div class="d">Real-time hero quote, intraday chart, ATR-based position sizer, 200+ stock ranking.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'analysis' %}" style="text-decoration:none">
+      <div class="t">Analysis</div>
+      <div class="d">Per-stock report with SMA/RSI/MACD verdict, quarterly financials, and 0–10 buy rating.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'commodities' %}" style="text-decoration:none">
+      <div class="t">Commodities</div>
+      <div class="d">Gold, silver, copper, crude — ETF-vs-futures comparison and a long-term position sizer.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'risk_analyser' %}" style="text-decoration:none">
+      <div class="t">Risk Analyser</div>
+      <div class="d">Volatility-based screener ranking stocks that fit your capital + loss tolerance.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'screener' %}" style="text-decoration:none">
+      <div class="t">Screener</div>
+      <div class="d">Multi-factor ranking + 9-strategy backtester. Tune weights, save scans, export CSV.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'portfolio' %}" style="text-decoration:none">
+      <div class="t">Portfolio</div>
+      <div class="d">Track holdings and P&amp;L with per-stock price journey since buy date.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'watchlist' %}" style="text-decoration:none">
+      <div class="t">Watchlist</div>
+      <div class="d">Up to 20 tickers with 60-second auto-refresh.</div>
+    </a>
+    <a class="feature-tile" href="{% url 'learning' %}" style="text-decoration:none">
+      <div class="t">Learning Center</div>
+      <div class="d">Ten modules + 113-entry Encyclopedia — learning bundled with tooling.</div>
+    </a>
+  </div>
+</div>
+
+<!-- Pane: how it works -->
+<div class="a-pane" id="pane-how">
+  <div class="card p-6 md:p-8">
+    <div class="eyebrow mb-2">End-to-end flow</div>
+    <h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; margin-bottom: 22px;">From raw market data to a trade thesis</h3>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+      <div class="flow-step">
+        <div class="n">01</div>
+        <div class="t">Fetch</div>
+        <div class="d">yfinance pulls OHLCV + fundamentals. Cached 60s–5min.</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="n">02</div>
+        <div class="t">Compute</div>
+        <div class="d">SMA · RSI · MACD · BB · ATR · ADX from scratch in pandas.</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="n">03</div>
+        <div class="t">Score</div>
+        <div class="d">Multi-factor rank with configurable weights + fundamental gate.</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="n">04</div>
+        <div class="t">Explain</div>
+        <div class="d">Every verdict expands into the reasons behind it.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pane: philosophy -->
+<div class="a-pane" id="pane-why">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="principle"><div class="num">01</div><div><div style="font-family:'Space Grotesk',sans-serif;font-weight:700;">Plain English over jargon.</div><div class="text-muted text-sm mt-1">Every indicator explains the "why", not just the number.</div></div></div>
+    <div class="principle"><div class="num">02</div><div><div style="font-family:'Space Grotesk',sans-serif;font-weight:700;">Show the reasoning.</div><div class="text-muted text-sm mt-1">Verdicts expand into the exact factors that drove them.</div></div></div>
+    <div class="principle"><div class="num">03</div><div><div style="font-family:'Space Grotesk',sans-serif;font-weight:700;">Opinionated where it matters.</div><div class="text-muted text-sm mt-1">ETF over futures for long-term retail — and the page shows why.</div></div></div>
+    <div class="principle"><div class="num">04</div><div><div style="font-family:'Space Grotesk',sans-serif;font-weight:700;">Education bundled with tools.</div><div class="text-muted text-sm mt-1">Analysis pages link to relevant learning modules — research and study share a surface.</div></div></div>
+  </div>
+</div>
+
+<!-- Pane: engine room -->
+<div class="a-pane" id="pane-tech">
+  <div class="card p-6 md:p-8">
+    <div class="eyebrow mb-3">Engine room</div>
+    <h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; margin-bottom: 18px;">Built from scratch</h3>
+    <div class="flex flex-wrap gap-2 mb-5">
+      <span class="tech-pill">Django 4.2</span>
+      <span class="tech-pill">Python 3.9</span>
+      <span class="tech-pill">yfinance</span>
+      <span class="tech-pill">pandas · numpy</span>
+      <span class="tech-pill">Tailwind CSS</span>
+      <span class="tech-pill">Custom Canvas Charts</span>
+      <span class="tech-pill">ThreadPoolExecutor</span>
+      <span class="tech-pill">SSE streaming</span>
+      <span class="tech-pill">MySQL</span>
+    </div>
+    <p class="text-sm text-muted leading-relaxed">
+      All technical indicators (SMA, RSI, MACD, Bollinger, ATR, ADX, Supertrend) are computed
+      from scratch in pure pandas/numpy — no TA libraries. The screener runs its network fetches
+      in a 16-thread pool, cutting Nifty-50 scan time roughly 10×. Charts are drawn natively on
+      HTML5 canvas — no external chart library.
+    </p>
+  </div>
+</div>
+
+<!-- Pane: safety -->
+<div class="a-pane" id="pane-safe">
+  <div class="card p-6 md:p-8" style="border-color: rgba(251,113,133,0.35);">
+    <div class="eyebrow mb-3" style="color: var(--sa-danger);">Disclaimer</div>
+    <h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; margin-bottom: 18px; color: var(--sa-danger);">This is not investment advice</h3>
+    <div class="text-sm leading-relaxed space-y-3" style="color: var(--sa-ink);">
+      <p>TradeLab is a learning and research tool. Every rating, verdict, and recommendation is generated by deterministic rules on public market data — there is no human analyst behind them.</p>
+      <p>Volatility-based risk estimates assume markets stay "normal" and will understate losses in a real crash. Historical patterns don't guarantee future outcomes.</p>
+      <p style="color: var(--sa-ink);">Always do your own research, understand what you're buying, and never invest money you can't afford to lose. If in doubt, speak to a SEBI-registered advisor.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Animated counters
+  function animCount(el) {
+    var target = parseInt(el.dataset.count, 10);
+    var start = performance.now();
+    var dur = 1200;
+    function step(t) {
+      var p = Math.min(1, (t - start) / dur);
+      var val = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      el.textContent = val + (target >= 100 && p === 1 ? "+" : "");
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { animCount(e.target); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.4 });
+  document.querySelectorAll('[data-count]').forEach(function (el) { io.observe(el); });
+
+  // Tabs
+  var tabs = document.querySelectorAll('.a-tab');
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (x) { x.classList.remove('on'); });
+      t.classList.add('on');
+      document.querySelectorAll('.a-pane').forEach(function (p) { p.classList.remove('on'); });
+      document.getElementById('pane-' + t.dataset.pane).classList.add('on');
+    });
+  });
+
+  // Feature-tile mouse spotlight
+  document.querySelectorAll('.feature-tile').forEach(function (el) {
+    el.addEventListener('mousemove', function (e) {
+      var r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      el.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+  });
+})();
+</script>
+
+{% endblock %}

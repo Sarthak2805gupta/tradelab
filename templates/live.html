@@ -1,0 +1,1014 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Live Trading · TradeLab{% endblock %}
+{% block content %}
+
+<!-- Header with market-status badge -->
+<div class="flex items-start justify-between mb-6 flex-wrap gap-4">
+  <div>
+  <h2 class="text-2xl font-bold transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">Live / Day Trading Desk
+  </h2>
+  <p class="text-muted text-sm">Real-time quotes, ranked intraday candidates, and ATR-based position sizing — all in one screen.</p>
+  </div>
+  <div class="flex items-center gap-3">
+  <div class="px-4 py-2 rounded-lg {% if market.is_open %}bg-accent/20 border border-accent text-accent{% else %}bg-danger/10 border border-danger/40 text-danger{% endif %}">
+  <div class="text-[10px] uppercase tracking-wider font-semibold">{% if market.is_open %}Live Market{% else %}Market Closed{% endif %}</div>
+  <div class="text-sm font-bold">{{ market.now }}</div>
+  </div>
+  <div class="text-[10px] text-muted text-right">
+  <div>Auto-refresh every</div>
+  <div class="font-mono text-white">15s</div>
+  </div>
+  </div>
+</div>
+
+<!-- Indices strip -->
+<section class="grid grid-cols-3 gap-3 mb-6" id="indices-strip">
+  {% for idx in indices %}
+  <div class="bg-panel rounded-lg p-3 border border-slate-800">
+  <div class="text-[10px] text-muted uppercase tracking-wider">{{ idx.name }}</div>
+  <div class="text-lg font-bold font-mono mt-1">{{ idx.price }}</div>
+  <div class="text-xs font-mono {% if idx.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  {% if idx.change_pct >= 0 %}+{% endif %}{{ idx.change_pct }}%
+  </div>
+  </div>
+  {% endfor %}
+</section>
+
+<!-- Main grid: big quote + watchlist sidebar -->
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+  <!-- Left: active ticker hero + chart -->
+  <div>
+  <!-- Ticker search -->
+  <form method="get" class="flex gap-2 mb-4" autocomplete="off">
+  <div class="flex-1 relative">
+  <input name="ticker" value="{{ ticker }}"
+  placeholder="Type a stock name e.g. Infosys, TCS"
+  class="w-full bg-panel border border-slate-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent font-mono"
+  data-autocomplete="ticker" autocomplete="off" spellcheck="false" />
+  </div>
+  <button class="bg-accent hover:bg-emerald-400 text-base font-semibold px-5 rounded-lg transition">Go →</button>
+  </form>
+
+  {% if quote %}
+  <!-- Hero price card -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-6 mb-4">
+  <div class="flex items-start justify-between mb-4 flex-wrap gap-3">
+  <div>
+  <div class="text-xs text-muted uppercase tracking-wider">Active Ticker</div>
+  <div class="text-2xl font-bold font-mono">{{ ticker }}</div>
+  </div>
+  <div class="flex gap-2 flex-wrap">
+    <a href="{% url 'analysis' %}?ticker={{ ticker }}"
+       class="text-xs bg-panel2 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition">Full Analysis</a>
+    <button onclick="document.getElementById('live-portfolio-modal').classList.remove('hidden')"
+       class="text-xs bg-emerald-500 hover:bg-emerald-400 font-semibold px-3 py-1.5 rounded-lg transition">+ Portfolio</button>
+    <form method="post" action="{% url 'watchlist_add' %}" class="inline">{% csrf_token %}
+      <input type="hidden" name="ticker" value="{{ ticker }}" />
+      <button type="submit"
+         class="text-xs bg-panel2 hover:bg-slate-700 border border-slate-700 font-semibold px-3 py-1.5 rounded-lg transition">+ Watchlist</button>
+    </form>
+  </div>
+  </div>
+
+  <div class="flex items-baseline gap-4 mb-5" id="hero-price-block">
+  <div class="text-5xl font-bold font-mono" id="hero-price">₹{{ quote.price }}</div>
+  <div class="text-xl font-mono {% if quote.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}" id="hero-change">
+  {% if quote.change_pct >= 0 %}+{% endif %}{{ quote.change }} ({% if quote.change_pct >= 0 %}+{% endif %}{{ quote.change_pct }}%)
+  </div>
+  </div>
+
+  <!-- Intraday stats row -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+  <div class="bg-panel2 rounded-lg p-3">
+  <div class="text-[10px] text-muted uppercase tracking-wider">Day High</div>
+  <div class="font-mono text-accent" id="stat-high">₹{{ quote.day_high }}</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-3">
+  <div class="text-[10px] text-muted uppercase tracking-wider">Day Low</div>
+  <div class="font-mono text-danger" id="stat-low">₹{{ quote.day_low }}</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-3">
+  <div class="text-[10px] text-muted uppercase tracking-wider">Volume</div>
+  <div class="font-mono" id="stat-vol">{{ quote.volume }}</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-3">
+  <div class="text-[10px] text-muted uppercase tracking-wider">52W Range</div>
+  <div class="font-mono text-xs">₹{{ quote.fifty_two_week_low }} – ₹{{ quote.fifty_two_week_high }}</div>
+  </div>
+  </div>
+
+  <!-- Day range bar showing where price sits intraday -->
+  {% if levels and levels.day_range_pct %}
+  <div class="mt-5">
+  <div class="flex items-center justify-between text-[10px] text-muted uppercase tracking-wider mb-1">
+  <span>Day Low ₹{{ quote.day_low }}</span>
+  <span>Intraday Range {{ levels.day_range_pct|floatformat:2 }}%</span>
+  <span>Day High ₹{{ quote.day_high }}</span>
+  </div>
+  <div class="w-full bg-slate-800 rounded-full h-2 relative">
+  <div class="absolute h-4 w-1 bg-white rounded -top-1 shadow-lg"
+  style="left: calc({% widthratio quote.price|add:quote.day_low|stringformat:'f' 1 1 %}%);"
+  id="range-marker"></div>
+  <div class="h-2 rounded-full {% if quote.change_pct >= 0 %}bg-accent{% else %}bg-danger{% endif %}"
+  style="width: 100%;"></div>
+  </div>
+  </div>
+  {% endif %}
+  </div>
+
+  <!-- Add to portfolio modal -->
+  <div id="live-portfolio-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick="if(event.target===this)this.classList.add('hidden')">
+    <div class="bg-panel border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+      <h4 class="text-lg font-bold mb-4">Add {{ ticker }} to Portfolio</h4>
+      <form method="post" action="{% url 'portfolio_add' %}">
+        {% csrf_token %}
+        <input type="hidden" name="ticker" value="{{ ticker }}" />
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-muted block mb-1">Buy price (₹)</label>
+            <input name="buy_price" type="number" step="0.01" value="{{ quote.price }}"
+              class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-accent" />
+          </div>
+          <div>
+            <label class="text-xs text-muted block mb-1">Quantity (shares)</label>
+            <input name="quantity" type="number" min="1" value="1"
+              class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-accent" />
+          </div>
+          <div>
+            <label class="text-xs text-muted block mb-1">Date bought</label>
+            <input name="date_bought" type="date" value="{% now 'Y-m-d' %}"
+              class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-accent" />
+          </div>
+        </div>
+        <div class="flex gap-3 mt-5">
+          <button type="submit" class="flex-1 bg-emerald-500 hover:bg-emerald-400 font-semibold py-2 rounded-lg transition">Add to Portfolio</button>
+          <button type="button" onclick="document.getElementById('live-portfolio-modal').classList.add('hidden')"
+            class="flex-1 bg-panel2 hover:bg-slate-600 border border-slate-700 font-semibold py-2 rounded-lg transition">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Your Investment: personalized buy/sell/keep based on user's money -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-5 mb-4">
+    <div class="text-[10px] text-muted uppercase tracking-wider font-mono mb-3">Your Investment in {{ ticker }}</div>
+    <form id="invest-form" class="flex gap-3 mb-4 flex-wrap" onsubmit="return computePersonalVerdict(event)">
+      <div class="flex-1 min-w-[140px]">
+        <label class="text-[10px] text-muted block mb-1">Your buy price (₹)</label>
+        <input id="my-buy-price" type="number" step="0.01" placeholder="e.g. {{ quote.price }}"
+          class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-emerald-500" />
+      </div>
+      <div class="flex-1 min-w-[100px]">
+        <label class="text-[10px] text-muted block mb-1">Shares held</label>
+        <input id="my-shares" type="number" min="1" value="1" placeholder="e.g. 10"
+          class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-emerald-500" />
+      </div>
+      <div class="flex items-end">
+        <button type="submit"
+          class="bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold px-4 py-2 rounded-lg transition whitespace-nowrap">
+          What should I do?
+        </button>
+      </div>
+    </form>
+    <div id="personal-verdict" class="hidden"></div>
+  </div>
+
+  <!-- Intraday chart (5min bars, current session) -->
+      <!-- Intraday Buy / Sell / Hold verdict -->
+      {% if intraday_call %}
+      <div class="bg-panel border border-slate-800 rounded-xl p-5 mb-4">
+        <div class="flex items-start justify-between mb-3 flex-wrap gap-3">
+          <div>
+            <div class="text-[10px] text-muted uppercase tracking-wider font-mono mb-1">Intraday Signal</div>
+            <div class="text-3xl font-bold
+              {% if intraday_call.action_color == 'emerald' %}text-emerald-400
+              {% elif intraday_call.action_color == 'rose' %}text-rose-400
+              {% else %}text-amber-400{% endif %}">
+              {{ intraday_call.action }}
+            </div>
+          </div>
+          <div class="flex gap-2 text-xs font-mono">
+            <span class="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">{{ intraday_call.signals_bull }} bullish</span>
+            <span class="bg-rose-500/20 text-rose-400 px-2 py-1 rounded">{{ intraday_call.signals_bear }} bearish</span>
+          </div>
+        </div>
+        <p class="text-sm text-slate-300 mb-3">{{ intraday_call.summary }}</p>
+        <div class="space-y-1.5">
+          {% for r in intraday_call.reasons %}
+            <div class="text-xs text-slate-400 flex gap-2">
+              <span class="text-slate-600 select-none">—</span>
+              <span>{{ r }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Intraday chart -->
+      <!-- Intraday chart with type switcher + volume -->
+      <div class="bg-panel border border-slate-800 rounded-xl overflow-hidden">
+        <div class="flex items-center justify-between px-5 pt-4 pb-3 flex-wrap gap-3">
+          <div class="flex bg-panel2 rounded-lg p-0.5 gap-0.5" id="liveChartTypeBtns">
+            <button data-type="candle" class="lctype-btn px-3 py-1.5 rounded-md text-xs font-semibold transition-all bg-slate-700 text-white">Candles</button>
+            <button data-type="line" class="lctype-btn px-3 py-1.5 rounded-md text-xs font-semibold transition-all text-slate-400 hover:text-white">Line</button>
+            <button data-type="area" class="lctype-btn px-3 py-1.5 rounded-md text-xs font-semibold transition-all text-slate-400 hover:text-white">Area</button>
+          </div>
+          <span class="text-[10px] text-muted font-mono">auto-refresh 60s</span>
+        </div>
+        <div id="live-chart" class="w-full" style="height: 280px;"></div>
+        <div id="live-vol-chart" class="w-full" style="height: 80px;"></div>
+      </div>
+  {% elif ticker %}
+    <div class="bg-panel border border-danger/40 rounded-xl p-6">
+      <h3 class="text-danger font-bold mb-2">Can't load {{ ticker }}</h3>
+      <p class="text-muted text-sm">Check the stock name or try a different spelling.</p>
+    </div>
+  {% else %}
+    <div class="bg-panel border border-slate-800 rounded-xl p-8 text-center">
+      <h3 class="font-display text-2xl font-bold mb-3">Search for a stock to get started</h3>
+      <p class="text-muted text-sm mb-5">Type a company name or ticker in the search bar above. Try Reliance, Infosys, HDFC Bank, or any NSE stock.</p>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="?ticker=RELIANCE.NS" class="bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-lg px-4 py-2 text-sm transition">Reliance</a>
+        <a href="?ticker=HDFCBANK.NS" class="bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-lg px-4 py-2 text-sm transition">HDFC Bank</a>
+        <a href="?ticker=INFY.NS" class="bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-lg px-4 py-2 text-sm transition">Infosys</a>
+        <a href="?ticker=TCS.NS" class="bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-lg px-4 py-2 text-sm transition">TCS</a>
+        <a href="?ticker=ITC.NS" class="bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-lg px-4 py-2 text-sm transition">ITC</a>
+        <a href="?ticker=SBIN.NS" class="bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-lg px-4 py-2 text-sm transition">SBI</a>
+      </div>
+    </div>
+  {% endif %}
+  </div>
+
+  <!-- Right: top day-trade candidates + watchlist sidebar -->
+  <div>
+  <div class="sticky top-4 space-y-4">
+  <!-- Top day-trade candidates -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-4">
+  <div class="flex items-center justify-between mb-3">
+  <h3 class="font-semibold text-sm">Top Intraday Picks</h3>
+  <span class="text-[10px] text-muted">ranked by ATR + liquidity</span>
+  </div>
+  {% if top_candidates %}
+  <div class="space-y-2">
+  {% for c in top_candidates %}
+  <a href="?ticker={{ c.ticker }}{% if form_amount %}&amount={{ form_amount }}&risk={{ form_risk }}{% endif %}"
+  class="block bg-panel2 rounded-lg p-3 border {% if c.ticker == ticker %}border-accent{% else %}border-slate-700 hover:border-accent{% endif %} transition">
+  <div class="flex items-center justify-between mb-1">
+  <div class="font-mono text-xs font-semibold">{{ c.ticker }}</div>
+  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold
+  {% if c.tier_color == 'accent' %}bg-accent/20 text-accent
+  {% elif c.tier_color == 'danger' %}bg-danger/20 text-danger
+  {% else %}bg-yellow-400/20 text-yellow-400{% endif %}">
+  {{ c.score }}
+  </span>
+  </div>
+  <div class="flex items-center justify-between text-[10px]">
+  <span class="text-muted">ATR {{ c.atr_pct }}%</span>
+  <span class="font-mono {% if c.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  {% if c.change_pct >= 0 %}+{% endif %}{{ c.change_pct }}%
+  </span>
+  </div>
+  </a>
+  {% endfor %}
+  </div>
+  {% else %}
+    {% if rankings_loading %}
+      <p class="text-xs text-muted">Rankings loading in background — refresh in a few seconds.</p>
+    {% else %}
+      <p class="text-xs text-muted">Couldn't rank candidates right now.</p>
+    {% endif %}
+  {% endif %}
+  </div>
+
+  <!-- Watchlist -->
+  <div class="bg-panel border border-slate-800 rounded-xl p-4">
+  <div class="flex items-center justify-between mb-3">
+  <h3 class="font-semibold text-sm"> Watchlist</h3>
+  <a href="{% url 'watchlist' %}" class="text-[10px] text-muted hover:text-accent">Manage →</a>
+  </div>
+  {% if watchlist_quotes %}
+  <div class="space-y-2" id="watchlist-list">
+  {% for q in watchlist_quotes %}
+  <a href="?ticker={{ q.ticker }}{% if form_amount %}&amount={{ form_amount }}&risk={{ form_risk }}{% endif %}"
+  class="block bg-panel2 rounded-lg p-3 border {% if q.ticker == ticker %}border-accent{% else %}border-slate-700 hover:border-accent{% endif %} transition">
+  <div class="flex items-center justify-between">
+  <div>
+  <div class="font-mono text-sm font-semibold">{{ q.ticker }}</div>
+  <div class="font-mono text-xs">₹{{ q.price }}</div>
+  </div>
+  <div class="text-right">
+  <div class="text-xs font-mono {% if q.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  {% if q.change_pct >= 0 %}+{% endif %}{{ q.change_pct }}%
+  </div>
+  </div>
+  </div>
+  </a>
+  {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-xs text-muted">Empty. Add stocks via <a href="{% url 'watchlist' %}" class="text-accent">the Watchlist</a>.
+  </p>
+  {% endif %}
+  </div>
+  </div>
+  </div>
+</div>
+
+<!-- Intraday position sizer -->
+<div class="bg-panel border border-slate-800 rounded-xl p-6 mt-6">
+  <h3 class="text-lg font-bold mb-1">Intraday Position Sizer</h3>
+  <p class="text-xs text-muted mb-4">Enter capital + max loss per trade. We'll compute share count, stop-loss (1 ATR), target (1.5:1 R:R), and expected P&L.
+  Sizer runs against the <strong class="text-white font-mono">{{ ticker }}</strong> active ticker above.
+  </p>
+  <form method="get" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+  <input type="hidden" name="ticker" value="{{ ticker }}" />
+  <div>
+  <label class="text-xs text-muted block mb-1">Capital (₹)</label>
+  <input name="amount" value="{{ form_amount }}" type="number" min="1" step="any" placeholder="e.g. 100000"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-accent font-mono" />
+  </div>
+  <div>
+  <label class="text-xs text-muted block mb-1">Max risk per trade (%)</label>
+  <input name="risk" value="{{ form_risk }}" type="number" min="0.1" max="100" step="0.1" placeholder="e.g. 2"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-accent font-mono" />
+  </div>
+  <div class="flex items-end">
+  <button class="bg-accent hover:bg-emerald-400 text-base font-semibold px-5 py-2 rounded-lg transition w-full">Size Trade →
+  </button>
+  </div>
+  </form>
+  <p class="text-[11px] text-muted mt-3 italic">Pros risk 1–2% of capital per trade. Even 10 losses in a row only draws you down 20%, leaving room to recover.
+  </p>
+
+  {% if sizer %}
+  <div class="mt-5">
+  {% if sizer.ok %}
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 border-accent">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Buy</div>
+  <div class="text-2xl font-bold">{{ sizer.shares }} shares</div>
+  <div class="text-xs text-muted mt-1">@ ₹{{ sizer.price }} · total ₹{{ sizer.position_value|inr }}</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 border-danger">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Stop-Loss</div>
+  <div class="text-2xl font-bold text-danger">₹{{ sizer.stop_price }}</div>
+  <div class="text-xs text-muted mt-1">−₹{{ sizer.stop_distance_rs }} · −{{ sizer.stop_distance_pct }}% (1 ATR)</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 border-accent">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Target</div>
+  <div class="text-2xl font-bold text-accent">₹{{ sizer.target_price }}</div>
+  <div class="text-xs text-muted mt-1">+₹{{ sizer.target_profit_rs|inr }} profit ({{ sizer.reward_risk_ratio }}:1)</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 border-yellow-400">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Max Loss</div>
+  <div class="text-2xl font-bold">₹{{ sizer.max_loss_rs|inr }}</div>
+  <div class="text-xs text-muted mt-1">{{ sizer.max_loss_pct_of_capital }}% of capital</div>
+  </div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <p class="text-sm text-slate-300 leading-relaxed">{{ sizer.explanation }}</p>
+  </div>
+  <form method="post" action="{% url 'basket_add' %}" class="mt-3">
+  {% csrf_token %}
+  <input type="hidden" name="ticker" value="{{ ticker }}" />
+  <input type="hidden" name="amount" value="{{ form_amount }}" />
+  <input type="hidden" name="risk" value="{{ form_risk }}" />
+  <button class="bg-accent hover:bg-emerald-400 text-sm font-semibold px-4 py-2 rounded-lg transition">
+  + Add to Basket
+  </button>
+  <span class="text-[11px] text-muted ml-2">Queue this trade alongside others for the day</span>
+  </form>
+  {% else %}
+  <div class="bg-panel2 rounded-lg p-4 border-l-4 border-danger">
+  <div class="text-sm font-bold text-danger mb-1">Can't size this trade</div>
+  <p class="text-sm text-slate-300">{{ sizer.explanation }}</p>
+  </div>
+  {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Day Trade Basket -->
+{% if basket.count > 0 %}
+<div class="bg-panel border border-slate-800 rounded-xl p-6 mt-6">
+  <div class="flex items-center justify-between mb-1 flex-wrap gap-3">
+  <h3 class="text-lg font-bold">Day Trade Basket ({{ basket.count }})</h3>
+  <form method="post" action="{% url 'basket_clear' %}">
+  {% csrf_token %}
+  <button class="text-xs text-muted hover:text-danger">Clear all</button>
+  </form>
+  </div>
+  <p class="text-xs text-muted mb-4">All queued trades for today. Execute them in your broker at the listed prices — this desk only plans,
+  it doesn't place orders.
+  </p>
+
+  <!-- Aggregate totals -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Total Capital Deployed</div>
+  <div class="text-xl font-bold font-mono">₹{{ basket.total_position_value|inr }}</div>
+  <div class="text-[10px] text-muted mt-1">across {{ basket.sizable_count }} position{{ basket.sizable_count|pluralize }}</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Combined Max Loss</div>
+  <div class="text-xl font-bold font-mono text-danger">₹{{ basket.total_max_loss|inr }}</div>
+  <div class="text-[10px] mt-1 {% if basket.combined_risk_pct <= 5 %}text-accent{% elif basket.combined_risk_pct <= 10 %}text-yellow-400{% else %}text-danger{% endif %}">
+  {{ basket.combined_risk_pct }}% of total capital
+  </div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Combined Target</div>
+  <div class="text-xl font-bold font-mono text-accent">₹{{ basket.total_target_profit|inr }}</div>
+  <div class="text-[10px] text-muted mt-1">total upside if all hit targets</div>
+  </div>
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-[10px] text-muted uppercase tracking-wider mb-1">Portfolio R:R</div>
+  <div class="text-xl font-bold font-mono">{{ basket.combined_reward_risk }}:1</div>
+  <div class="text-[10px] text-muted mt-1">basket-level reward:risk</div>
+  </div>
+  </div>
+
+  {% if basket.combined_risk_pct > 10 %}
+  <div class="bg-danger/10 border border-danger/40 rounded-lg p-3 mb-5 text-sm">
+  <strong class="text-danger">High combined risk.</strong>
+  <span class="text-slate-300">You're risking {{ basket.combined_risk_pct }}% of capital across this basket. Even if each trade is individually
+  sized at 2%, stacking them compounds risk. Consider removing weaker setups or shrinking position sizes.
+  </span>
+  </div>
+  {% elif basket.combined_risk_pct > 5 %}
+  <div class="bg-yellow-400/10 border border-yellow-400/40 rounded-lg p-3 mb-5 text-sm">
+  <strong class="text-yellow-400">Moderate combined risk ({{ basket.combined_risk_pct }}%).</strong>
+  <span class="text-slate-300">Manageable, but one bad day could hurt. Watch correlations.</span>
+  </div>
+  {% endif %}
+
+  <!-- Per-trade rows -->
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+  <thead>
+  <tr class="text-xs text-muted uppercase tracking-wider border-b border-slate-700">
+  <th class="text-left py-2 pr-3">Ticker</th>
+  <th class="text-right py-2 px-3">Shares</th>
+  <th class="text-right py-2 px-3">Entry</th>
+  <th class="text-right py-2 px-3">Stop</th>
+  <th class="text-right py-2 px-3">Target</th>
+  <th class="text-right py-2 px-3">Max Loss</th>
+  <th class="text-right py-2 px-3">Target Profit</th>
+  <th></th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for entry in basket.items %}
+  <tr class="border-b border-slate-800/60">
+  <td class="py-2 pr-3">
+  <a href="?ticker={{ entry.input.ticker }}&amount={{ entry.input.amount|floatformat:0 }}&risk={{ entry.input.risk }}"
+  class="font-mono font-semibold hover:text-accent">{{ entry.input.ticker }}</a>
+  <div class="text-[10px] text-muted">₹{{ entry.input.amount|inr }} @ {{ entry.input.risk }}%</div>
+  </td>
+  {% if entry.plan.ok %}
+  <td class="py-2 px-3 text-right font-mono">{{ entry.plan.shares }}</td>
+  <td class="py-2 px-3 text-right font-mono">₹{{ entry.plan.price }}</td>
+  <td class="py-2 px-3 text-right font-mono text-danger">₹{{ entry.plan.stop_price }}</td>
+  <td class="py-2 px-3 text-right font-mono text-accent">₹{{ entry.plan.target_price }}</td>
+  <td class="py-2 px-3 text-right font-mono text-danger">₹{{ entry.plan.max_loss_rs|inr }}</td>
+  <td class="py-2 px-3 text-right font-mono text-accent">₹{{ entry.plan.target_profit_rs|inr }}</td>
+  {% else %}
+  <td colspan="6" class="py-2 px-3 text-center text-xs text-muted italic">Can't size — {{ entry.plan.reason|default:"data unavailable" }}
+  </td>
+  {% endif %}
+  <td class="py-2 pl-3 text-right">
+  <form method="post" action="{% url 'basket_remove' entry.index %}">
+  {% csrf_token %}
+  <button class="text-xs text-muted hover:text-danger" title="Remove from basket"></button>
+  </form>
+  </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Full rankings table -->
+<div class="bg-panel border border-slate-800 rounded-xl p-6 mt-6">
+  <div class="flex items-center justify-between mb-1 flex-wrap gap-3">
+    <h3 class="text-lg font-bold">Full Day-Trading Rankings</h3>
+    <div class="text-xs text-muted">{{ ranked_full|length }} stocks scored</div>
+  </div>
+  <p class="text-xs text-muted mb-4">
+    Pick a category or search for a stock. Table stays hidden until you filter — no wall of data.
+  </p>
+
+  <!-- Category chips + search bar -->
+  <div class="mb-4">
+    <div class="flex flex-wrap gap-2 mb-3">
+      <button type="button" data-filter="cat-nifty50"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-emerald-500 hover:text-emerald-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        Nifty 50
+      </button>
+      <button type="button" data-filter="cat-sensex"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-emerald-500 hover:text-emerald-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        Sensex
+      </button>
+      <button type="button" data-filter="cat-bank"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-emerald-500 hover:text-emerald-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        Banking
+      </button>
+      <button type="button" data-filter="cat-score8"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-emerald-500 hover:text-emerald-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        Score 8+
+      </button>
+      <button type="button" data-filter="tier-prime"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-emerald-500 hover:text-emerald-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        PRIME tier
+      </button>
+      <button type="button" data-filter="up"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-emerald-500 hover:text-emerald-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        Green today
+      </button>
+      <button type="button" data-filter="down"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-rose-400 hover:text-rose-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        Red today
+      </button>
+      <button type="button" data-filter="show-all"
+        class="filter-chip bg-panel2 border border-slate-700 hover:border-amber-400 hover:text-amber-400 px-4 py-2 rounded-lg text-sm font-semibold transition">
+        Show all
+      </button>
+      <button type="button" data-filter="reset"
+        class="filter-chip text-xs text-muted hover:text-white px-3 py-2 transition">
+        Clear
+      </button>
+    </div>
+    <div class="relative">
+      <input id="rankings-filter" type="text" placeholder="Search by name or ticker (e.g. 'infosys', 'HDFC', 'bank')"
+        class="w-full bg-panel2 border border-slate-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-emerald-500 font-mono text-sm" />
+    </div>
+    <div class="text-right mt-2">
+      <span class="text-[11px] text-muted" id="filter-count"></span>
+    </div>
+  </div>
+
+  {% if ranked_full %}
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm" id="rankings-table">
+  <thead>
+  <tr class="text-xs text-muted uppercase tracking-wider border-b border-slate-700">
+  <th class="text-left py-2 pr-3">#</th>
+  <th class="text-left py-2 pr-3">Stock</th>
+  <th class="text-right py-2 px-3">Price</th>
+  <th class="text-right py-2 px-3">Today %</th>
+  <th class="text-right py-2 px-3">ATR %</th>
+  <th class="text-right py-2 px-3">Today Range</th>
+  <th class="text-right py-2 px-3">Avg Vol</th>
+  <th class="text-center py-2 px-3">Call</th>
+  <th class="text-center py-2 px-3">Tier</th>
+  <th class="text-right py-2 pl-3">Score</th>
+  <th></th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for r in ranked_full %}
+  <tr class="border-b border-slate-800/60 hover:bg-panel2/40 rankings-row"
+  style="display:none"
+  data-name="{{ r.name|lower }}"
+  data-ticker="{{ r.ticker|lower }}"
+  data-tier="{{ r.tier|lower }}"
+  data-cats="{{ r.categories }}"
+  data-score="{{ r.score }}"
+  data-direction="{% if r.change_pct >= 0 %}up{% else %}down{% endif %}">
+  <td class="py-2 pr-3 text-muted">{{ forloop.counter }}</td>
+  <td class="py-2 pr-3">
+  <a href="?ticker={{ r.ticker }}{% if form_amount %}&amount={{ form_amount }}&risk={{ form_risk }}{% endif %}"
+  class="hover:text-accent">
+  <div class="font-semibold">{{ r.name }}</div>
+  <div class="text-[11px] text-muted font-mono">{{ r.ticker }}</div>
+  </a>
+  </td>
+  <td class="py-2 px-3 text-right font-mono">₹{{ r.price }}</td>
+  <td class="py-2 px-3 text-right font-mono {% if r.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  {% if r.change_pct >= 0 %}+{% endif %}{{ r.change_pct }}%
+  </td>
+  <td class="py-2 px-3 text-right font-mono">{{ r.atr_pct }}%</td>
+  <td class="py-2 px-3 text-right font-mono">{% if r.day_range_pct %}{{ r.day_range_pct }}%{% else %}—{% endif %}</td>
+  <td class="py-2 px-3 text-right font-mono text-xs">
+  {% if r.avg_volume %}
+  {% if r.avg_volume >= 1000000 %}{{ r.avg_volume|floatformat:0|slice:":-6" }}M{% else %}{{ r.avg_volume|floatformat:0 }}{% endif %}
+  {% else %}—{% endif %}
+  </td>
+  <td class="py-2 px-3 text-center">
+  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold
+  {% if r.intraday_color == 'emerald' %}bg-emerald-500/20 text-emerald-400
+  {% elif r.intraday_color == 'rose' %}bg-rose-500/20 text-rose-400
+  {% else %}bg-amber-500/20 text-amber-400{% endif %}">{{ r.intraday_action }}</span>
+  </td>
+  <td class="py-2 px-3 text-center">
+  <span class="text-[10px] px-2 py-0.5 rounded-full
+  {% if r.tier_color == 'accent' %}bg-accent/20 text-accent
+  {% elif r.tier_color == 'danger' %}bg-danger/20 text-danger
+  {% else %}bg-yellow-400/20 text-yellow-400{% endif %}">
+  {{ r.tier }}
+  </span>
+  </td>
+  <td class="py-2 pl-3 text-right font-mono font-bold
+  {% if r.tier_color == 'accent' %}text-accent
+  {% elif r.tier_color == 'danger' %}text-danger
+  {% else %}text-yellow-400{% endif %}">
+  {{ r.score }}
+  </td>
+  <td class="py-2 pl-3 text-right">
+  <a href="?ticker={{ r.ticker }}{% if form_amount %}&amount={{ form_amount }}&risk={{ form_risk }}{% endif %}"
+  class="text-[10px] bg-panel2 hover:bg-slate-700 border border-slate-700 px-2 py-1 rounded transition">Size →
+  </a>
+  </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+  {% else %}
+  {% if rankings_loading %}
+    <p class="text-sm text-muted">Rankings are computing in the background — refresh in 10-15 seconds and they'll appear.</p>
+  {% else %}
+    <p class="text-muted text-sm">No candidates ranked yet. Try again in a moment.</p>
+  {% endif %}
+  {% endif %}
+</div>
+
+<script>
+// Rankings filter: rows start hidden. User must pick a chip or type a search
+// to reveal matching rows. This avoids the "wall of 25 stocks" experience.
+(function () {
+  var input = document.getElementById("rankings-filter");
+  var countEl = document.getElementById("filter-count");
+  var rows = document.querySelectorAll(".rankings-row");
+  var activeFilter = null; // 'cat-nifty50', 'tier-prime', 'up', 'down', 'show-all', etc.
+
+  function apply() {
+    var q = (input.value || "").trim().toLowerCase();
+    var hasFilter = !!activeFilter || !!q;
+    var visible = 0;
+
+    rows.forEach(function (r) {
+      // Default: hidden unless a filter is active
+      if (!hasFilter) { r.style.display = "none"; return; }
+
+      var name = r.dataset.name || "";
+      var ticker = r.dataset.ticker || "";
+      var tier = r.dataset.tier || "";
+      var direction = r.dataset.direction || "";
+      var cats = r.dataset.cats || "";
+      var score = parseFloat(r.dataset.score) || 0;
+
+      var textMatch = !q || name.includes(q) || ticker.includes(q);
+      var chipMatch = true;
+
+      if (activeFilter === "cat-nifty50") chipMatch = cats.includes("nifty50");
+      else if (activeFilter === "cat-sensex") chipMatch = cats.includes("sensex");
+      else if (activeFilter === "cat-bank") chipMatch = cats.includes("bank");
+      else if (activeFilter === "cat-score8") chipMatch = score >= 8;
+      else if (activeFilter === "tier-prime") chipMatch = tier === "prime";
+      else if (activeFilter === "up") chipMatch = direction === "up";
+      else if (activeFilter === "down") chipMatch = direction === "down";
+      else if (activeFilter === "show-all") chipMatch = true;
+
+      var show = textMatch && chipMatch;
+      r.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+
+    if (countEl) {
+      countEl.textContent = hasFilter ? "Showing " + visible + " / " + rows.length : "";
+    }
+
+    // Highlight active chip
+    document.querySelectorAll(".filter-chip").forEach(function (btn) {
+      var f = btn.dataset.filter;
+      if (f === activeFilter) {
+        btn.classList.add("border-emerald-500", "text-emerald-400");
+      } else {
+        btn.classList.remove("border-emerald-500", "text-emerald-400");
+      }
+    });
+  }
+
+  if (input) {
+    input.addEventListener("input", function () {
+      // Typing in search = show matches regardless of chip state
+      if (input.value.trim()) activeFilter = "show-all";
+      apply();
+    });
+  }
+
+  document.querySelectorAll("[data-filter]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var f = btn.dataset.filter;
+      if (f === "reset") {
+        activeFilter = null;
+        if (input) input.value = "";
+      } else if (activeFilter === f) {
+        activeFilter = null; // toggle off
+      } else {
+        activeFilter = f;
+        if (input && f !== "show-all") input.value = ""; // clear text when picking chip
+      }
+      apply();
+    });
+  });
+
+  apply(); // initial state: everything hidden
+})();
+</script>
+
+{% endblock %}
+
+{% block scripts %}
+{% if quote %}
+<script src="{% static 'js/tradelab-chart.js' %}"></script>
+<script>
+(function () {
+  const ticker = "{{ ticker|escapejs }}";
+
+  // -------- Intraday chart with type switch + volume --------
+  const UP = "#10b981", DOWN = "#f43f5e", GRID = "#1e293b", BG = "#0b0f17";
+  function istTick(ts) {
+    return new Date(ts * 1000).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+
+  const chartEl = document.getElementById("live-chart");
+  const priceChart = LightweightCharts.createChart(chartEl, {
+    layout: { background: { color: BG }, textColor: "#94a3b8" },
+    grid: { vertLines: { color: GRID }, horzLines: { color: GRID } },
+    crosshair: { mode: 0 },
+    rightPriceScale: { borderColor: GRID },
+    timeScale: { timeVisible: true, secondsVisible: false, borderColor: GRID, tickMarkFormatter: istTick },
+    localization: { locale: "en-IN",
+      timeFormatter: ts => new Date(ts * 1000).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false
+      }),
+    },
+    width: chartEl.clientWidth, height: 280,
+  });
+  const volEl = document.getElementById("live-vol-chart");
+  const volChart = LightweightCharts.createChart(volEl, {
+    layout: { background: { color: BG }, textColor: "#64748b" },
+    grid: { vertLines: { color: "transparent" }, horzLines: { color: GRID } },
+    rightPriceScale: { borderColor: GRID, scaleMargins: { top: 0.1, bottom: 0 } },
+    timeScale: { visible: false }, crosshair: { mode: 0 },
+    width: volEl.clientWidth, height: 80,
+  });
+  const volSeries = volChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "vol" });
+  priceChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if(r) volChart.timeScale().setVisibleLogicalRange(r); });
+  volChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if(r) priceChart.timeScale().setVisibleLogicalRange(r); });
+
+  let liveSeries = null, liveType = "candle", liveBars = [];
+  function liveCreateSeries(type) {
+    if (liveSeries) try { priceChart.removeSeries(liveSeries); } catch(e) {}
+    liveType = type;
+    if (type === "candle") liveSeries = priceChart.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN, wickUpColor: UP, wickDownColor: DOWN });
+    else if (type === "line") liveSeries = priceChart.addLineSeries({ color: UP, lineWidth: 2 });
+    else if (type === "area") liveSeries = priceChart.addAreaSeries({ lineColor: UP, lineWidth: 2, topColor: "rgba(16,185,129,0.4)", bottomColor: "rgba(16,185,129,0.02)" });
+    return liveSeries;
+  }
+  function liveSetData(bars) {
+    liveBars = bars;
+    if (!liveSeries) liveCreateSeries(liveType);
+    if (liveType === "line" || liveType === "area") liveSeries.setData(bars.map(b => ({ time: b.time, value: b.close })));
+    else liveSeries.setData(bars.map(b => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
+    volSeries.setData(bars.map(b => ({ time: b.time, value: b.volume, color: b.close >= b.open ? "rgba(16,185,129,0.5)" : "rgba(244,63,94,0.5)" })));
+    // Annotate intraday events
+    if (liveType === "candle" || liveType === "bar") liveAnnotate(bars);
+    else liveSeries.setMarkers([]);
+    priceChart.timeScale().fitContent(); volChart.timeScale().fitContent();
+  }
+
+  function liveAnnotate(bars) {
+    if (!bars.length) { liveSeries.setMarkers([]); return; }
+    const markers = [];
+    const totalVol = bars.reduce((s,b) => s + b.volume, 0);
+    const avgVol = totalVol / bars.length;
+    let dayHigh = -Infinity, dayLow = Infinity, hiIdx = 0, loIdx = 0;
+    let bestUp = {pct:0,idx:-1}, bestDown = {pct:0,idx:-1};
+    bars.forEach((b,i) => {
+      if (b.high > dayHigh) { dayHigh = b.high; hiIdx = i; }
+      if (b.low < dayLow) { dayLow = b.low; loIdx = i; }
+      if (i > 0) {
+        const m = ((b.close - b.open) / b.open) * 100;
+        if (m > bestUp.pct) bestUp = {pct:m, idx:i};
+        if (m < bestDown.pct) bestDown = {pct:m, idx:i};
+      }
+    });
+    if (bars.length > 1) {
+      const fm = ((bars[0].close - bars[0].open) / bars[0].open) * 100;
+      if (Math.abs(fm) > 0.3) markers.push({ time: bars[0].time, position: fm > 0 ? "belowBar" : "aboveBar", color: fm > 0 ? UP : DOWN, shape: "circle", text: (fm > 0 ? "Strong open +" : "Weak open ") + fm.toFixed(1) + "%" });
+    }
+    if (hiIdx > 0 && hiIdx < bars.length - 1) markers.push({ time: bars[hiIdx].time, position: "aboveBar", color: "#f59e0b", shape: "arrowDown", text: "Day high ₹" + dayHigh.toFixed(2) });
+    if (loIdx > 0 && loIdx < bars.length - 1) markers.push({ time: bars[loIdx].time, position: "belowBar", color: "#f59e0b", shape: "arrowUp", text: "Day low ₹" + dayLow.toFixed(2) });
+    if (bestUp.idx > 0 && bestUp.pct > 0.3) { const b = bars[bestUp.idx]; markers.push({ time: b.time, position: "belowBar", color: UP, shape: "arrowUp", text: "Sharpest rally +" + bestUp.pct.toFixed(1) + "% — " + (b.volume > avgVol*2 ? "heavy volume" : "light volume") }); }
+    if (bestDown.idx > 0 && Math.abs(bestDown.pct) > 0.3) { const b = bars[bestDown.idx]; markers.push({ time: b.time, position: "aboveBar", color: DOWN, shape: "arrowDown", text: "Sharpest drop " + bestDown.pct.toFixed(1) + "% — " + (b.volume > avgVol*2 ? "heavy selling" : "light selling") }); }
+    const mt = new Set(markers.map(m => m.time));
+    bars.forEach((b,i) => { if (i > 1 && !mt.has(b.time) && b.volume > avgVol*3) markers.push({ time: b.time, position: b.close >= b.open ? "belowBar" : "aboveBar", color: "#8b5cf6", shape: "circle", text: (b.volume/avgVol).toFixed(1) + "x volume spike" }); });
+    markers.sort((a,b) => a.time - b.time);
+    liveSeries.setMarkers(markers);
+  }
+  liveCreateSeries("candle");
+
+  function loadChart() {
+    fetch(`/api/history/${encodeURIComponent(ticker)}/?period=1d&interval=5m`)
+      .then(r => r.json())
+      .then(d => liveSetData(d.bars || []))
+      .catch(() => {});
+  }
+  loadChart();
+
+  document.querySelectorAll("#liveChartTypeBtns .lctype-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#liveChartTypeBtns .lctype-btn").forEach(x => { x.classList.remove("bg-slate-700", "text-white"); x.classList.add("text-slate-400"); });
+      btn.classList.remove("text-slate-400"); btn.classList.add("bg-slate-700", "text-white");
+      liveCreateSeries(btn.dataset.type);
+      if (liveBars.length) liveSetData(liveBars);
+    });
+  });
+  window.addEventListener("resize", () => { priceChart.applyOptions({ width: chartEl.clientWidth }); volChart.applyOptions({ width: volEl.clientWidth }); });
+
+  // -------- Personal investment verdict --------
+  window.computePersonalVerdict = function(e) {
+    e.preventDefault();
+    const buyPrice = parseFloat(document.getElementById("my-buy-price").value);
+    const shares = parseInt(document.getElementById("my-shares").value);
+    const el = document.getElementById("personal-verdict");
+    if (!buyPrice || !shares || buyPrice <= 0 || shares <= 0) {
+      el.innerHTML = '<p class="text-sm text-rose-400">Enter a valid buy price and share count.</p>';
+      el.classList.remove("hidden");
+      return false;
+    }
+
+    const currentPrice = {{ quote.price }};
+    const invested = buyPrice * shares;
+    const currentVal = currentPrice * shares;
+    const pnl = currentVal - invested;
+    const pnlPct = (pnl / invested * 100);
+    const isUp = pnl >= 0;
+
+    // Intraday signal from server
+    const intradayAction = "{{ intraday_call.action|default:'HOLD' }}";
+    const intradayBull = {{ intraday_call.signals_bull|default:0 }};
+    const intradayBear = {{ intraday_call.signals_bear|default:0 }};
+
+    // Decision logic combining P&L position + intraday signal
+    let action, actionColor, reasons = [];
+
+    if (pnlPct > 15 && intradayBear >= 2) {
+      action = "SELL — book profits";
+      actionColor = "text-rose-400";
+      reasons.push("You're up " + pnlPct.toFixed(1) + "% — a solid gain that many investors never see.");
+      reasons.push("The intraday signal is bearish (" + intradayBear + " signals down) — the stock may be topping out today.");
+      reasons.push("Booking partial or full profits here locks in real returns. Greed turns winners into losers.");
+    } else if (pnlPct > 15 && intradayBull >= 2) {
+      action = "HOLD — let it ride";
+      actionColor = "text-emerald-400";
+      reasons.push("You're up " + pnlPct.toFixed(1) + "% and the intraday signal is still bullish (" + intradayBull + " signals up).");
+      reasons.push("Don't sell a stock that's still climbing. Consider a trailing stop at your buy price to protect the downside.");
+      reasons.push("If it hits +20-25%, reassess — that's where most retail investors should start trimming.");
+    } else if (pnlPct > 5) {
+      action = "HOLD — in the green";
+      actionColor = "text-emerald-400";
+      reasons.push("You're up " + pnlPct.toFixed(1) + "% — a healthy unrealised gain.");
+      reasons.push("No urgency to sell unless you need the cash. The position is working in your favour.");
+      if (intradayBear >= 2) reasons.push("Today's signal is bearish, but don't let one day's action override a winning position.");
+    } else if (pnlPct >= -2 && pnlPct <= 5) {
+      action = "HOLD — near breakeven";
+      actionColor = "text-amber-400";
+      reasons.push("You're roughly flat (" + pnlPct.toFixed(1) + "%). No reason to panic or celebrate.");
+      if (intradayBull >= 2) {
+        reasons.push("Intraday signal is bullish — momentum is on your side today. Patience.");
+      } else if (intradayBear >= 2) {
+        reasons.push("Intraday signal is bearish — but being flat means no real damage. Wait for a clearer signal before acting.");
+      } else {
+        reasons.push("Intraday signal is neutral. Hold and review after earnings or a meaningful catalyst.");
+      }
+    } else if (pnlPct < -10 && intradayBear >= 2) {
+      action = "CONSIDER SELLING — cut losses";
+      actionColor = "text-rose-400";
+      reasons.push("You're down " + Math.abs(pnlPct).toFixed(1) + "% and today's signal is bearish (" + intradayBear + " signals down).");
+      reasons.push("Holding a losing stock that's still falling is the most expensive mistake in retail investing.");
+      reasons.push("Selling at a loss is painful, but it frees up capital for a better setup. The market doesn't care about your entry price.");
+    } else if (pnlPct < -10 && intradayBull >= 2) {
+      action = "HOLD — possible recovery";
+      actionColor = "text-amber-400";
+      reasons.push("You're down " + Math.abs(pnlPct).toFixed(1) + "%, but today's signal is bullish (" + intradayBull + " signals up).");
+      reasons.push("The stock may be bottoming out. Hold for now, but set a hard stop — if it drops another 5% from here, exit.");
+    } else if (pnlPct < -5) {
+      action = "HOLD — but set a stop";
+      actionColor = "text-amber-400";
+      reasons.push("You're down " + Math.abs(pnlPct).toFixed(1) + "%. Not critical yet, but set a mental stop-loss.");
+      reasons.push("If the stock drops to " + (buyPrice * 0.85).toFixed(2) + " (15% below your buy), exit. Protecting capital is rule #1.");
+    } else {
+      action = "BUY MORE — average down";
+      actionColor = "text-emerald-400";
+      reasons.push("Small loss (" + pnlPct.toFixed(1) + "%) with " + (intradayBull >= 2 ? "bullish" : "neutral") + " intraday signal.");
+      reasons.push("If your original thesis still holds, buying more at a lower price improves your average cost. But only with fresh capital you can afford to lose.");
+    }
+
+    // Render
+    const pnlColor = isUp ? "text-emerald-400" : "text-rose-400";
+    el.innerHTML = `
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div class="bg-panel2 rounded-lg p-3">
+          <div class="text-[10px] text-muted uppercase tracking-wider">Invested</div>
+          <div class="font-mono font-bold">\u20b9${invested.toLocaleString('en-IN', {maximumFractionDigits:0})}</div>
+        </div>
+        <div class="bg-panel2 rounded-lg p-3">
+          <div class="text-[10px] text-muted uppercase tracking-wider">Current Value</div>
+          <div class="font-mono font-bold">\u20b9${currentVal.toLocaleString('en-IN', {maximumFractionDigits:0})}</div>
+        </div>
+        <div class="bg-panel2 rounded-lg p-3">
+          <div class="text-[10px] text-muted uppercase tracking-wider">P&L</div>
+          <div class="font-mono font-bold ${pnlColor}">${isUp?'+':''}${pnl.toFixed(0)} (${isUp?'+':''}${pnlPct.toFixed(1)}%)</div>
+        </div>
+        <div class="bg-panel2 rounded-lg p-3">
+          <div class="text-[10px] text-muted uppercase tracking-wider">Per Share</div>
+          <div class="font-mono font-bold ${pnlColor}">${isUp?'+':''}${(currentPrice - buyPrice).toFixed(2)}</div>
+        </div>
+      </div>
+      <div class="bg-panel2 rounded-lg p-4 border-l-4 ${action.includes('SELL')||action.includes('CUT') ? 'border-rose-500' : action.includes('BUY') ? 'border-emerald-500' : 'border-amber-500'} mb-3">
+        <div class="text-2xl font-bold ${actionColor} mb-1">${action}</div>
+        <div class="space-y-1.5 mt-2">
+          ${reasons.map(r => '<div class="text-xs text-slate-400 flex gap-2"><span class="text-slate-600 select-none">\u2014</span><span>' + r + '</span></div>').join('')}
+        </div>
+      </div>
+    `;
+    el.classList.remove("hidden");
+    return false;
+  };
+
+  // -------- Auto-refresh hero quote every 15s --------
+  function refreshQuote() {
+  fetch(`/api/quote/${encodeURIComponent(ticker)}/`)
+  .then(r => r.ok ? r.json() : null)
+  .then(q => {
+  if (!q) return;
+  const priceEl = document.getElementById("hero-price");
+  const changeEl = document.getElementById("hero-change");
+  const highEl = document.getElementById("stat-high");
+  const lowEl = document.getElementById("stat-low");
+  const volEl = document.getElementById("stat-vol");
+  if (!priceEl) return;
+
+  // Flash price element green/red on update
+  const prevPrice = parseFloat(priceEl.textContent.replace(/[^\d.-]/g, ""));
+  const nextPrice = q.price;
+  const flashClass = nextPrice > prevPrice ? "text-accent" : nextPrice < prevPrice ? "text-danger" : "";
+
+  priceEl.textContent = "₹" + nextPrice;
+  if (flashClass) {
+  priceEl.classList.add(flashClass);
+  setTimeout(() => priceEl.classList.remove(flashClass), 800);
+  }
+  const sign = q.change_pct >= 0 ? "+" : "";
+  changeEl.textContent = `${sign}${q.change} (${sign}${q.change_pct}%)`;
+  changeEl.className = "text-xl font-mono " + (q.change_pct >= 0 ? "text-accent" : "text-danger");
+  if (highEl) highEl.textContent = "₹" + q.day_high;
+  if (lowEl) lowEl.textContent = "₹" + q.day_low;
+  if (volEl) volEl.textContent = q.volume.toLocaleString("en-IN");
+  })
+  .catch(() => {});
+  }
+  setInterval(refreshQuote, 15000);
+
+  // Chart updates on a slower cadence (intraday bars only land every ~5 min anyway)
+  setInterval(loadChart, 60000);
+
+  // -------- Auto-refresh watchlist sidebar every 30s --------
+  setInterval(function () {
+  fetch("/api/watchlist/")
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+  if (!d || !d.quotes) return;
+  const listEl = document.getElementById("watchlist-list");
+  if (!listEl) return;
+  d.quotes.forEach(q => {
+  // Find the existing <a> for this ticker by its inner text
+  const links = listEl.querySelectorAll("a");
+  links.forEach(a => {
+  const tickerSpan = a.querySelector(".font-mono");
+  if (tickerSpan && tickerSpan.textContent.trim() === q.ticker) {
+  const priceEl = a.querySelectorAll(".font-mono")[1];
+  const changeEl = a.querySelector(".text-accent, .text-danger");
+  if (priceEl) priceEl.textContent = "₹" + q.price;
+  if (changeEl) {
+  const sign = q.change_pct >= 0 ? "+" : "";
+  changeEl.textContent = sign + q.change_pct + "%";
+  changeEl.className = "text-xs font-mono " + (q.change_pct >= 0 ? "text-accent" : "text-danger");
+  }
+  }
+  });
+  });
+  })
+  .catch(() => {});
+  }, 30000);
+})();
+</script>
+{% endif %}
+{% endblock %}

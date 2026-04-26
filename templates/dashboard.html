@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · TradeLab{% endblock %}
+{% block content %}
+
+<style>
+  .hero-blob { position: absolute; pointer-events: none; width: 480px; height: 480px; border-radius: 50%; filter: blur(80px); opacity: 0.22; z-index: -1; }
+  .hero-blob.b1 { background: var(--sa-accent);  top: -140px; right: -80px; }
+  .hero-blob.b2 { background: var(--sa-accent2); bottom: -160px; left: -100px; opacity: 0.15; }
+  @keyframes float1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-30px, 40px); } }
+  @keyframes float2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(40px, -30px); } }
+  .hero-blob.b1 { animation: float1 18s ease-in-out infinite; }
+  .hero-blob.b2 { animation: float2 22s ease-in-out infinite; }
+  .live-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--sa-accent); box-shadow: 0 0 0 0 var(--sa-accent); animation: pulse 2s infinite; }
+  .live-dot.off { background: var(--sa-muted); animation: none; box-shadow: none; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.5); } 70% { box-shadow: 0 0 0 10px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }
+  .gradient-text { background: linear-gradient(135deg, var(--sa-accent), var(--sa-accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .spotlight { position: relative; overflow: hidden; }
+  .spotlight::after { content:''; position: absolute; inset: 0; background: radial-gradient(600px circle at var(--mx,50%) var(--my,50%), rgba(52,211,153,0.08), transparent 40%); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .spotlight:hover::after { opacity: 1; }
+  @keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fade-up .55s cubic-bezier(.2,.8,.2,1) backwards; }
+  .stagger > * { animation: fade-up .55s cubic-bezier(.2,.8,.2,1) backwards; }
+  .stagger > *:nth-child(1) { animation-delay: 80ms; }
+  .stagger > *:nth-child(2) { animation-delay: 160ms; }
+  .stagger > *:nth-child(3) { animation-delay: 240ms; }
+  .stagger > *:nth-child(4) { animation-delay: 320ms; }
+  .stagger > *:nth-child(5) { animation-delay: 400ms; }
+  .change-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .change-pill.up { background: rgba(52,211,153,0.12); color: var(--sa-accent); }
+  .change-pill.dn { background: rgba(251,113,133,0.12); color: var(--sa-danger); }
+</style>
+
+<!-- Hero -->
+<div style="position:relative;overflow:hidden;border-radius:24px;padding:40px 28px 44px;margin-bottom:32px;border:1px solid var(--sa-border);background:linear-gradient(180deg,var(--sa-card-bg),var(--sa-card-bg2));backdrop-filter:blur(12px);">
+  <div class="hero-blob b1"></div>
+  <div class="hero-blob b2"></div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+    <div class="eyebrow">Workbench / Overview</div>
+    <span style="display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;border:1px solid var(--sa-border);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--sa-muted);">
+      <span class="live-dot {% if not market_is_open %}off{% endif %}"></span>
+      {% if market_is_open %}<span style="color:var(--sa-accent);font-weight:600;">Market open</span>{% else %}Market closed{% endif %}
+    </span>
+  </div>
+  <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block"
+      style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2rem,4vw,3.2rem);line-height:1;letter-spacing:-0.02em;">
+    Welcome back, <span class="gradient-text">{% if user.is_authenticated %}{{ user.username }}{% else %}trader{% endif %}</span>.
+  </h2>
+  <p style="color:var(--sa-muted);font-size:14.5px;margin-top:14px;max-width:60ch;line-height:1.6;">
+    Live Indian indices, top movers, and your portfolio snapshot. Click any ticker to drill into a full analysis — or jump to the <a href="{% url 'screener' %}" style="color:var(--sa-accent);">Screener</a> to scan for fresh ideas.
+  </p>
+</div>
+
+<!-- Indices -->
+<section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 stagger">
+  {% for idx in indices %}
+    <div class="card card-hover spotlight p-5" onmousemove="this.style.setProperty('--mx',event.offsetX+'px');this.style.setProperty('--my',event.offsetY+'px');">
+      <div class="flex items-baseline justify-between mb-3">
+        <div class="eyebrow">{{ idx.name }}</div>
+        <span class="change-pill {% if idx.change_pct >= 0 %}up{% else %}dn{% endif %}">
+          {% if idx.change_pct >= 0 %}▲ +{% else %}▼ {% endif %}{{ idx.change_pct }}%
+        </span>
+      </div>
+      <div class="num-big text-3xl" data-count="{{ idx.price }}" data-prefix="₹">₹{{ idx.price }}</div>
+      <div class="text-xs mt-2 font-mono" style="color:var(--sa-muted);">
+        {% if idx.change_pct >= 0 %}+{% endif %}{{ idx.change }} today
+      </div>
+    </div>
+  {% empty %}
+    <div class="col-span-3 text-muted text-sm">Index data unavailable. Check your network or yfinance install.</div>
+  {% endfor %}
+</section>
+
+{% if portfolio_summary %}
+<section class="card card-hover p-6 mb-10 fade-in">
+  <div class="flex items-baseline justify-between mb-4 flex-wrap gap-2">
+    <div class="eyebrow">Your Positions</div>
+    <a href="{% url 'portfolio' %}" style="font-size:12px;color:var(--sa-accent);font-weight:600;">Open portfolio →</a>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
+    <div>
+      <div class="text-muted text-xs uppercase tracking-wider">Invested</div>
+      <div class="num-big text-3xl mt-2" data-count="{{ portfolio_summary.invested }}" data-prefix="₹">₹{{ portfolio_summary.invested }}</div>
+    </div>
+    <div>
+      <div class="text-muted text-xs uppercase tracking-wider">Current Value</div>
+      <div class="num-big text-3xl mt-2" data-count="{{ portfolio_summary.current }}" data-prefix="₹">₹{{ portfolio_summary.current }}</div>
+    </div>
+    <div>
+      <div class="text-muted text-xs uppercase tracking-wider">Unrealised P&amp;L</div>
+      <div class="num-big text-3xl mt-2 {% if portfolio_summary.pnl >= 0 %}text-accent{% else %}text-danger{% endif %}"
+           data-count="{{ portfolio_summary.pnl }}" data-prefix="₹">₹{{ portfolio_summary.pnl }}</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ═══ Ranked Screener Picks (from screener_v3) ═══════════════════════ -->
+<section class="card p-6 mb-10">
+  <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
+    <div>
+      <div class="eyebrow mb-1">Top Screener Picks · Nifty 50</div>
+      <h3 class="font-display text-xl font-bold">Ranked by multi-factor score</h3>
+      <p class="text-muted text-xs mt-1">Weighted screen across trend, momentum, volume, liquidity, and relative strength. Regime-aware qualify threshold. Refreshes hourly.</p>
+    </div>
+    <div class="text-right">
+      <div id="sp-regime" class="text-[10px] text-muted uppercase tracking-wider font-mono">—</div>
+      <a href="{% url 'screener' %}" class="text-xs text-accent hover:text-emerald-400 mt-1 inline-block">Open Screener →</a>
+    </div>
+  </div>
+  <div id="sp-status" class="text-xs text-muted">Computing Nifty 50 rankings… this may take 30-60 seconds on first load.</div>
+  <div id="sp-list" class="hidden overflow-x-auto">
+    <table class="w-full text-xs font-mono">
+      <thead class="text-muted uppercase">
+        <tr>
+          <th class="text-left py-2 pr-3">#</th>
+          <th class="text-left pr-3">Ticker</th>
+          <th class="text-right pr-3">Score</th>
+          <th class="text-right pr-3">RSI</th>
+          <th class="text-right pr-3">ADX</th>
+          <th class="text-right pr-3">1M Chg</th>
+          <th class="text-right pr-3">Liq</th>
+        </tr>
+      </thead>
+      <tbody id="sp-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Movers -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 stagger">
+  <div class="card card-hover p-6">
+    <div class="flex items-baseline justify-between mb-4">
+      <div class="eyebrow">Top Gainers</div>
+      <div class="text-[10px] text-muted font-mono">live</div>
+    </div>
+    <table class="w-full text-sm">
+      <tbody>
+      {% for s in gainers %}
+        <tr class="border-t border-white/5 first:border-t-0">
+          <td class="py-3">
+            <a class="font-display font-semibold hover:text-accent transition" href="{% url 'analysis' %}?ticker={{ s.ticker }}">{{ s.ticker }}</a>
+          </td>
+          <td class="py-3 text-right font-mono">₹{{ s.price }}</td>
+          <td class="py-3 text-right font-mono text-accent">+{{ s.change_pct }}%</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card card-hover p-6">
+    <div class="flex items-baseline justify-between mb-4">
+      <div class="eyebrow">Top Losers</div>
+      <div class="text-[10px] text-muted font-mono">live</div>
+    </div>
+    <table class="w-full text-sm">
+      <tbody>
+      {% for s in losers %}
+        <tr class="border-t border-white/5 first:border-t-0">
+          <td class="py-3">
+            <a class="font-display font-semibold hover:text-danger transition" href="{% url 'analysis' %}?ticker={{ s.ticker }}">{{ s.ticker }}</a>
+          </td>
+          <td class="py-3 text-right font-mono">₹{{ s.price }}</td>
+          <td class="py-3 text-right font-mono text-danger">{{ s.change_pct }}%</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+// Count-up animation for any element with data-count.
+// Triggers when the element scrolls into view.
+(function () {
+  function animateCount(el) {
+    var raw = el.dataset.count;
+    var prefix = el.dataset.prefix || "";
+    var target = parseFloat(String(raw).replace(/,/g, ""));
+    if (!isFinite(target)) return;
+    var decimals = (String(raw).split(".")[1] || "").length;
+    var start = performance.now();
+    var dur = 1200;
+    function fmt(v) {
+      var s = v.toFixed(decimals);
+      if (decimals === 0) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return prefix + s;
+    }
+    function step(t) {
+      var p = Math.min(1, (t - start) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(target * eased);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { animateCount(e.target); io.unobserve(e.target); } });
+  }, { threshold: 0.4 });
+  document.querySelectorAll('[data-count]').forEach(function (el) { io.observe(el); });
+})();
+</script>
+
+<!-- Commodities strip -->
+<section class="card p-6 mb-10">
+  <div class="flex items-baseline justify-between mb-4">
+    <div>
+      <div class="eyebrow">Long-Term Commodities</div>
+      <h3 class="font-display text-xl font-semibold mt-1">Gold &amp; Silver ETFs</h3>
+    </div>
+    <a href="{% url 'commodities' %}" class="text-xs text-muted hover:text-accent font-medium">All commodities →</a>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {% for c in commodity_etfs %}
+      <a href="{% url 'analysis' %}?ticker={{ c.ticker }}"
+         class="bg-panel2 rounded-xl p-5 border border-white/5 hover:border-accent transition flex items-center justify-between group">
+        <div>
+          <div class="eyebrow">{{ c.name }}</div>
+          <div class="font-mono text-[11px] text-muted mt-1">{{ c.ticker }}</div>
+        </div>
+        <div class="text-right">
+          {% if c.quote %}
+            <div class="num-big text-xl text-white group-hover:text-accent transition">₹{{ c.quote.price }}</div>
+            <div class="text-sm font-mono mt-1 {% if c.quote.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+              {% if c.quote.change_pct >= 0 %}+{% endif %}{{ c.quote.change_pct }}%
+            </div>
+          {% else %}
+            <div class="text-muted text-sm italic">loading</div>
+          {% endif %}
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- Watch today -->
+<section class="card p-6">
+  <div class="eyebrow mb-4">Today's Biggest Moves</div>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    {% for s in watch_today %}
+      <a class="bg-panel2 rounded-xl p-4 text-center hover:ring-1 hover:ring-accent transition border border-white/5"
+         href="{% url 'analysis' %}?ticker={{ s.ticker }}">
+        <div class="text-[10px] text-muted font-mono uppercase tracking-wider">{{ s.ticker }}</div>
+        <div class="num-big text-lg mt-2 text-white">₹{{ s.price }}</div>
+        <div class="text-xs mt-1 font-mono {% if s.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+          {% if s.change_pct >= 0 %}+{% endif %}{{ s.change_pct }}%
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const status = document.getElementById("sp-status");
+  const list = document.getElementById("sp-list");
+  const tbody = document.getElementById("sp-tbody");
+  const regimeEl = document.getElementById("sp-regime");
+  if (!status) return;
+
+  function esc(s) { const d = document.createElement("div"); d.textContent = String(s || ""); return d.innerHTML; }
+
+  fetch("/screener/api/dashboard/top-picks")
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success || !d.top || !d.top.length) {
+        status.textContent = d.error ? ("Couldn't compute picks: " + d.error) : "No picks available right now.";
+        return;
+      }
+      const reg = d.regime || {};
+      regimeEl.textContent = `${reg.regime || '—'} market · qualify score ${reg.qualify_score ?? '?'}${d.cached ? ' · cached' : ''}`;
+      tbody.innerHTML = d.top.map((r, i) => {
+        const chg = r["1M_Chg%"];
+        const chgCls = chg > 0 ? "text-emerald-400" : "text-rose-400";
+        const liqCls = (r.Liq_Grade || "") === "A" ? "text-emerald-400"
+                    : (r.Liq_Grade || "") === "B" ? "text-emerald-300"
+                    : "text-amber-400";
+        const tick = (r.Ticker || "").replace(".NS", "");
+        return `<tr class="border-t border-white/5 hover:bg-white/5 cursor-pointer" onclick="location.href='/analysis/?ticker=${esc(tick)}'">
+          <td class="py-2 pr-3 text-muted">${i + 1}</td>
+          <td class="pr-3 font-bold text-slate-100">${esc(tick)}</td>
+          <td class="text-right pr-3 text-emerald-400 font-bold">${(r.Score ?? 0).toFixed(1)}</td>
+          <td class="text-right pr-3 text-slate-300">${(r.RSI ?? 0).toFixed(0)}</td>
+          <td class="text-right pr-3 text-slate-300">${(r.ADX ?? 0).toFixed(0)}</td>
+          <td class="text-right pr-3 ${chgCls}">${chg != null ? (chg > 0 ? '+' : '') + chg.toFixed(1) + '%' : '—'}</td>
+          <td class="text-right pr-3 ${liqCls}">${esc(r.Liq_Grade || '?')}</td>
+        </tr>`;
+      }).join("");
+      status.classList.add("hidden");
+      list.classList.remove("hidden");
+    })
+    .catch(e => {
+      status.textContent = "Couldn't load picks: " + e.message;
+    });
+})();
+</script>
+{% endblock %}

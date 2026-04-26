@@ -1,0 +1,1240 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{% block title %}TradeLab — Indian Markets{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+<meta name="theme-color" content="#07090f">
+<meta name="description" content="TradeLab — a planning desk for Indian retail investors. Live quotes, analysis, screener, portfolio, and learning in one place.">
+<meta property="og:title" content="TradeLab — Indian Markets">
+<meta property="og:description" content="Dashboards, screeners and tools for Indian equity markets.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<script>
+  // Light mode removed — always force dark
+  (function () {
+    try { localStorage.removeItem('stockapp-theme'); } catch (_) {}
+    document.documentElement.classList.remove('light');
+  })();
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          base:   'var(--sa-base, #07090f)',
+          panel:  'var(--sa-panel, #0f1420)',
+          panel2: 'var(--sa-panel2, #151c2c)',
+          accent:  'var(--sa-accent, #34d399)',
+          accent2: 'var(--sa-accent2, #fbbf24)',
+          danger:  'var(--sa-danger, #fb7185)',
+          muted:   'var(--sa-muted, #8a94a7)',
+          ink:     'var(--sa-ink, #e6ebf3)',
+        },
+        fontFamily: {
+          display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+      }
+    }
+  };
+</script>
+<style>
+  /* ── Theme tokens ─────────────────────────────────────────── */
+  :root {
+    --sa-base:    #07090f;
+    --sa-panel:   #0f1420;
+    --sa-panel2:  #151c2c;
+    --sa-accent:  #34d399;
+    --sa-accent2: #fbbf24;
+    --sa-danger:  #fb7185;
+    --sa-muted:   #8a94a7;
+    --sa-ink:     #e6ebf3;
+    --sa-border:  rgba(255,255,255,0.06);
+    --sa-border2: rgba(255,255,255,0.12);
+    --sa-card-bg:    rgba(21, 28, 44, 0.55);
+    --sa-card-bg2:   rgba(15, 20, 32, 0.75);
+    --sa-card-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 20px 50px -24px rgba(0,0,0,0.65);
+    --sa-glow:    radial-gradient(1100px 600px at 80% -10%, rgba(52,211,153,0.09), transparent 60%),
+                  radial-gradient(900px 500px at -10% 110%, rgba(251,191,36,0.06), transparent 60%);
+    --sa-nav-hover:  rgba(255,255,255,0.04);
+    --sa-nav-active: rgba(52,211,153,0.10);
+  }
+  html.light {
+    --sa-base:    #f6f8fc;
+    --sa-panel:   #ffffff;
+    --sa-panel2:  #f1f5f9;
+    --sa-accent:  #059669;
+    --sa-accent2: #b45309;
+    --sa-danger:  #e11d48;
+    --sa-muted:   #64748b;
+    --sa-ink:     #0f172a;
+    --sa-border:  rgba(15,23,42,0.08);
+    --sa-border2: rgba(15,23,42,0.16);
+    --sa-card-bg:    rgba(255,255,255,0.75);
+    --sa-card-bg2:   rgba(248,250,252,0.9);
+    --sa-card-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 10px 30px -14px rgba(15,23,42,0.12);
+    --sa-glow:    radial-gradient(1000px 600px at 85% -10%, rgba(5,150,105,0.10), transparent 60%),
+                  radial-gradient(900px 500px at -10% 110%, rgba(180,83,9,0.08), transparent 60%);
+    --sa-nav-hover:  rgba(15,23,42,0.04);
+    --sa-nav-active: rgba(5,150,105,0.10);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { font-family: Inter, system-ui, sans-serif; color: var(--sa-ink); }
+  h1, h2, h3, h4 { font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.01em; }
+  .font-mono, .font-num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: "tnum"; }
+  table td, table th { font-variant-numeric: tabular-nums; }
+
+  html { scroll-behavior: smooth; }
+  body {
+    background:
+      var(--sa-glow),
+      var(--sa-base);
+    min-height: 100vh;
+    transition: background .2s, color .2s;
+    position: relative;
+  }
+  /* Subtle grain noise overlay for texture — feels expensive */
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.03 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity: 0.6; mix-blend-mode: overlay;
+  }
+  /* All real content sits above the noise */
+  aside.sidebar, .flex-1 { position: relative; z-index: 1; }
+
+  /* Thin custom scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--sa-border2); border-radius: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--sa-muted);
+  }
+
+  /* Glassy card — unified container used across every page */
+  .card {
+    background: linear-gradient(180deg, var(--sa-card-bg) 0%, var(--sa-card-bg2) 100%);
+    border: 1px solid var(--sa-border);
+    border-radius: 18px;
+    box-shadow: var(--sa-card-shadow);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .card-hover { transition: border-color .2s, transform .2s, box-shadow .2s; position: relative; }
+  .card-hover:hover { border-color: var(--sa-border2); transform: translateY(-2px); box-shadow: 0 24px 48px -24px rgba(0,0,0,0.55), 0 0 0 1px var(--sa-border2) inset; }
+  html.light .card-hover:hover { box-shadow: 0 18px 40px -20px rgba(15,23,42,0.18), 0 0 0 1px var(--sa-border2) inset; }
+
+  /* Tiny shimmer sweep on card hover — subtle, not distracting */
+  .card-hover::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.06) 48%, transparent 60%);
+    opacity: 0; transition: opacity .3s;
+  }
+  html.light .card-hover::before { background: linear-gradient(105deg, transparent 30%, rgba(15,23,42,0.04) 48%, transparent 60%); }
+  .card-hover:hover::before { opacity: 1; }
+
+  /* Page shell — standardizes title + subtitle on every page */
+  .page-shell { max-width: 1400px; width: 100%; margin: 0 auto; }
+  .page-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 28px; }
+  .page-head h2 { font-size: clamp(1.7rem, 2.2vw, 2.25rem); font-weight: 700; line-height: 1.1; }
+  .page-head p  { color: var(--sa-muted); max-width: 62ch; }
+
+  .num-big { font-family: 'JetBrains Mono', monospace; font-feature-settings: "tnum"; font-weight: 700; }
+
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  .sidebar {
+    background: linear-gradient(180deg, rgba(15,20,32,0.85) 0%, rgba(7,9,15,0.9) 100%);
+    border-right: 1px solid var(--sa-border);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  html.light .sidebar {
+    background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(241,245,249,0.95) 100%);
+  }
+
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 12px; border-radius: 8px;
+    color: var(--sa-muted); font-weight: 500;
+    font-size: 13px; letter-spacing: -0.005em;
+    transition: background .15s, color .15s;
+  }
+  .nav-item:hover { color: var(--sa-ink); background: var(--sa-nav-hover); }
+  .nav-item.active {
+    color: var(--sa-accent);
+    background: var(--sa-nav-active);
+    font-weight: 600;
+  }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
+    width: 3px; border-radius: 3px;
+    background: var(--sa-accent);
+  }
+  .nav-dot {
+    width: 6px; height: 6px; border-radius: 999px;
+    background: currentColor; opacity: 0.5;
+    flex: none;
+  }
+  .nav-item.active .nav-dot { opacity: 1; box-shadow: 0 0 10px currentColor; }
+
+  .brand {
+    display: inline-flex; align-items: baseline; gap: 1px;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-weight: 700; font-size: 1.75rem; letter-spacing: -0.02em;
+  }
+  .brand .b1 { color: var(--sa-accent); }
+  .brand .b2 { color: var(--sa-ink); }
+  .brand .b3 { color: var(--sa-accent2); }
+
+  /* Theme toggle pill */
+  .theme-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; border: 1px solid var(--sa-border);
+    color: var(--sa-muted); padding: 8px 12px; border-radius: 10px;
+    cursor: pointer; font-size: 12px; width: 100%; justify-content: center;
+    transition: all .15s;
+  }
+  .theme-btn:hover { border-color: var(--sa-accent); color: var(--sa-accent); }
+
+  /* Top bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    background: linear-gradient(180deg, rgba(7,9,15,0.75), rgba(7,9,15,0.35));
+    border-bottom: 1px solid var(--sa-border);
+  }
+
+  /* Focus ring everywhere — but NOT on sidebar nav items (the .active state already
+     shows the current page; a focus ring on top of that looks like a doubled box). */
+  a, button, input, select, textarea { outline: none; }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    box-shadow: 0 0 0 2px var(--sa-base), 0 0 0 4px var(--sa-accent);
+    border-radius: 8px;
+  }
+  aside.sidebar .nav-item:focus-visible,
+  .bottom-tabs a:focus-visible { box-shadow: none; }
+
+  /* Light-mode overrides for existing Tailwind classes used in child templates */
+  html.light .text-white,
+  html.light .text-slate-100 { color: var(--sa-ink) !important; }
+  html.light .text-gray-400,
+  html.light .text-slate-300,
+  html.light .text-slate-400 { color: #475569 !important; }
+  html.light .text-slate-500,
+  html.light .text-slate-600 { color: #64748b !important; }
+  html.light .text-slate-200 { color: #1e293b !important; }
+  html.light .hover\:text-white:hover { color: var(--sa-ink) !important; }
+  html.light .hover\:text-slate-300:hover { color: #475569 !important; }
+
+  /* Tailwind Typography: cancel prose-invert (white-on-dark) in light mode */
+  html.light .prose-invert,
+  html.light .prose.prose-invert {
+    --tw-prose-body: #1e293b;
+    --tw-prose-headings: #0f172a;
+    --tw-prose-lead: #334155;
+    --tw-prose-links: var(--sa-accent);
+    --tw-prose-bold: #0f172a;
+    --tw-prose-counters: #475569;
+    --tw-prose-bullets: #94a3b8;
+    --tw-prose-hr: var(--sa-border2);
+    --tw-prose-quotes: #0f172a;
+    --tw-prose-quote-borders: var(--sa-border2);
+    --tw-prose-captions: #475569;
+    --tw-prose-code: #0f172a;
+    --tw-prose-pre-code: #e2e8f0;
+    --tw-prose-pre-bg: #0f172a;
+    --tw-prose-th-borders: var(--sa-border2);
+    --tw-prose-td-borders: var(--sa-border);
+    color: #1e293b !important;
+  }
+  html.light .prose-invert :where(h1,h2,h3,h4,h5,h6,strong,b) { color: #0f172a !important; }
+  html.light .prose-invert :where(p,li,dd,dt,blockquote,td,th) { color: #1e293b !important; }
+  html.light .text-muted { color: var(--sa-muted) !important; }
+  html.light .text-emerald-400 { color: var(--sa-accent) !important; }
+
+  html.light .bg-panel  { background-color: var(--sa-panel) !important; }
+  html.light .bg-panel2 { background-color: var(--sa-panel2) !important; }
+  html.light .bg-gray-800,
+  html.light .bg-slate-800 { background-color: #e2e8f0 !important; }
+  html.light .bg-slate-700 { background-color: #cbd5e1 !important; }
+  html.light .bg-white\/5 { background-color: rgba(15,23,42,0.04) !important; }
+  html.light .hover\:bg-gray-800:hover { background-color: #e2e8f0 !important; }
+  html.light .hover\:bg-white\/5:hover { background-color: rgba(15,23,42,0.05) !important; }
+  html.light .border-white\/5,
+  html.light .border-white\/10 { border-color: var(--sa-border) !important; }
+  html.light .border-slate-700,
+  html.light .border-slate-800 { border-color: var(--sa-border2) !important; }
+  html.light .divide-white\/5 > * + * { border-color: var(--sa-border) !important; }
+  html.light .bg-emerald-500\/20,
+  html.light .bg-emerald-500\/15 { background-color: rgba(16,185,129,0.15) !important; }
+  html.light .bg-rose-500\/20,
+  html.light .bg-rose-500\/15 { background-color: rgba(244,63,94,0.15) !important; }
+  html.light .bg-amber-500\/20,
+  html.light .bg-amber-500\/15 { background-color: rgba(245,158,11,0.15) !important; }
+
+  /* Mobile nav panel */
+  details[open] summary .chev { transform: rotate(90deg); }
+  .chev { transition: transform .2s; display: inline-block; }
+
+  /* ── Reusable dynamic bits — used by dashboard, about, learning, etc. ── */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--sa-accent), var(--sa-accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  @keyframes tl-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: tl-fade-up .55s cubic-bezier(.2,.8,.2,1) backwards; }
+  .stagger > * { animation: tl-fade-up .55s cubic-bezier(.2,.8,.2,1) backwards; }
+  .stagger > *:nth-child(1) { animation-delay: 80ms; }
+  .stagger > *:nth-child(2) { animation-delay: 160ms; }
+  .stagger > *:nth-child(3) { animation-delay: 240ms; }
+  .stagger > *:nth-child(4) { animation-delay: 320ms; }
+  .stagger > *:nth-child(5) { animation-delay: 400ms; }
+  .stagger > *:nth-child(6) { animation-delay: 480ms; }
+  .spotlight { position: relative; overflow: hidden; }
+  .spotlight::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(500px circle at var(--mx,50%) var(--my,50%), rgba(52,211,153,0.08), transparent 40%);
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .spotlight:hover::after { opacity: 1; }
+
+  /* ── Global <select> styling — unified dropdown look site-wide ── */
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: var(--sa-panel2);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a94a7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M19 9l-7 7-7-7'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    border: 1px solid var(--sa-border2);
+    border-radius: 10px;
+    color: var(--sa-ink);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    padding: 10px 38px 10px 14px;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s;
+    min-width: 120px;
+  }
+  select:hover  { border-color: var(--sa-accent); }
+  select:focus  { border-color: var(--sa-accent); outline: none; }
+  select:disabled { opacity: 0.55; cursor: not-allowed; }
+  select option { background-color: var(--sa-panel2); color: var(--sa-ink); }
+  html.light select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M19 9l-7 7-7-7'/></svg>");
+  }
+
+  /* Unified <input> look — covers all text-like inputs incl. bare <input> with no type */
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="search"],
+  input[type="email"], input[type="password"], input[type="tel"], input[type="url"],
+  input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], input[type="time"],
+  textarea {
+    background-color: var(--sa-panel2);
+    border: 1px solid var(--sa-border2);
+    border-radius: 10px;
+    color: var(--sa-ink);
+    padding: 10px 14px;
+    font-size: 13px;
+    font-family: Inter, system-ui, sans-serif;
+    transition: border-color .15s;
+    width: 100%;
+  }
+  input:not([type]):focus,
+  input[type="text"]:focus, input[type="number"]:focus, input[type="search"]:focus,
+  input[type="email"]:focus, input[type="password"]:focus, input[type="tel"]:focus, input[type="url"]:focus,
+  input[type="date"]:focus, input[type="datetime-local"]:focus, input[type="month"]:focus, input[type="week"]:focus, input[type="time"]:focus,
+  textarea:focus {
+    border-color: var(--sa-accent); outline: none;
+  }
+  /* Make the date picker icon visible on dark theme */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="month"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+    opacity: 0.7;
+  }
+  html.light input[type="date"]::-webkit-calendar-picker-indicator,
+  html.light input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  html.light input[type="month"]::-webkit-calendar-picker-indicator,
+  html.light input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: none;
+  }
+</style>
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body class="min-h-screen flex">
+
+<aside class="sidebar hidden md:flex w-60 flex-col h-screen sticky top-0 shrink-0">
+  <div class="px-5 pt-5 pb-4 border-b" style="border-color: var(--sa-border);">
+    <div class="brand" style="font-size:1.5rem;">
+      <span class="b1">₹</span><span class="b2">trade</span><span class="b3">Lab</span>
+    </div>
+    <p class="eyebrow mt-1">Indian markets · planning desk</p>
+  </div>
+
+  {% with active=request.resolver_match.url_name %}
+  <nav class="flex-1 flex flex-col px-2.5 py-3 gap-0.5 overflow-y-auto">
+    <div class="eyebrow px-3 mb-1.5">Workbench</div>
+    <a href="{% url 'dashboard' %}"     class="nav-item {% if active == 'dashboard' %}active{% endif %}"><span class="nav-dot"></span>Dashboard</a>
+    <a href="{% url 'live' %}"          class="nav-item {% if active == 'live' %}active{% endif %}"><span class="nav-dot"></span>Live / Day Trade</a>
+    <a href="{% url 'analysis' %}"      class="nav-item {% if active == 'analysis' %}active{% endif %}"><span class="nav-dot"></span>Analysis</a>
+    <a href="{% url 'commodities' %}"   class="nav-item {% if active == 'commodities' %}active{% endif %}"><span class="nav-dot"></span>Commodities</a>
+    <a href="{% url 'risk_analyser' %}" class="nav-item {% if active == 'risk_analyser' %}active{% endif %}"><span class="nav-dot"></span>Risk Analyser</a>
+    <a href="{% url 'screener' %}"      class="nav-item {% if active == 'screener' %}active{% endif %}"><span class="nav-dot"></span>Screener</a>
+    <a href="{% url 'what_if' %}"       class="nav-item {% if active == 'what_if' %}active{% endif %}"><span class="nav-dot"></span>What If</a>
+    <a href="{% url 'sip' %}"           class="nav-item {% if active == 'sip' %}active{% endif %}"><span class="nav-dot"></span>SIP Calculator</a>
+
+    <div class="eyebrow px-3 mt-3 mb-1.5">Positions</div>
+    <a href="{% url 'portfolio' %}"     class="nav-item {% if active == 'portfolio' %}active{% endif %}"><span class="nav-dot"></span>Portfolio</a>
+    <a href="{% url 'watchlist' %}"     class="nav-item {% if active == 'watchlist' %}active{% endif %}"><span class="nav-dot"></span>Watchlist</a>
+
+    <div class="eyebrow px-3 mt-3 mb-1.5">Study</div>
+    <a href="{% url 'learning' %}"      class="nav-item {% if active == 'learning' %}active{% endif %}"><span class="nav-dot"></span>Learning Center</a>
+    <a href="{% url 'encyclopedia' %}"  class="nav-item {% if active == 'encyclopedia' %}active{% endif %}"><span class="nav-dot"></span>Encyclopedia</a>
+  </nav>
+  {% endwith %}
+
+  <div class="px-3 py-3 border-t" style="border-color: var(--sa-border);">
+    <div style="display:flex;gap:10px;justify-content:center;font-size:11px;">
+      <a href="{% url 'about' %}" style="color: var(--sa-muted);">About</a>
+      <span style="color:var(--sa-border2);">·</span>
+      <a href="{% url 'privacy' %}" style="color: var(--sa-muted);">Privacy</a>
+    </div>
+  </div>
+</aside>
+
+<div class="flex-1 flex flex-col min-w-0">
+  <!-- Desktop top bar: auth on the right -->
+  <header class="topbar hidden md:flex items-center justify-end px-6 py-2.5 gap-3">
+    {% if user.is_authenticated %}
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 12px 5px 5px;border-radius:999px;background:rgba(255,255,255,0.03);border:1px solid var(--sa-border);">
+        <div style="width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--sa-accent),var(--sa-accent2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'Space Grotesk',sans-serif;font-size:12px;">{{ user.username|slice:":1"|upper }}</div>
+        <span style="font-weight:600;font-size:12.5px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ user.username }}</span>
+        <a href="{% url 'account_logout' %}" style="font-size:11px;color:var(--sa-muted);border-left:1px solid var(--sa-border2);padding-left:10px;">Sign out</a>
+      </div>
+    {% else %}
+      <a href="{% url 'account_signup' %}" style="font-size:12.5px;color:var(--sa-muted);font-weight:500;">Create account</a>
+      <a href="{% url 'account_login' %}" style="font-size:12.5px;font-weight:700;padding:8px 18px;border-radius:10px;background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;">Sign in</a>
+    {% endif %}
+  </header>
+  <!-- Mobile top bar -->
+  <header class="topbar md:hidden flex items-center justify-between px-4 py-3">
+    <div class="brand" style="font-size: 1.4rem;">
+      <span class="b1">₹</span><span class="b2">trade</span><span class="b3">Lab</span>
+    </div>
+    <details class="relative">
+      <summary class="cursor-pointer text-2xl leading-none select-none list-none"><span class="chev">›</span></summary>
+      <nav class="absolute right-0 mt-2 card p-3 space-y-1 text-sm z-50 min-w-[200px]">
+        <a class="nav-item" href="{% url 'dashboard' %}"><span class="nav-dot"></span>Dashboard</a>
+        <a class="nav-item" href="{% url 'live' %}"><span class="nav-dot"></span>Live / Day Trade</a>
+        <a class="nav-item" href="{% url 'analysis' %}"><span class="nav-dot"></span>Analysis</a>
+        <a class="nav-item" href="{% url 'commodities' %}"><span class="nav-dot"></span>Commodities</a>
+        <a class="nav-item" href="{% url 'risk_analyser' %}"><span class="nav-dot"></span>Risk Analyser</a>
+        <a class="nav-item" href="{% url 'screener' %}"><span class="nav-dot"></span>Screener</a>
+        <a class="nav-item" href="{% url 'portfolio' %}"><span class="nav-dot"></span>Portfolio</a>
+        <a class="nav-item" href="{% url 'watchlist' %}"><span class="nav-dot"></span>Watchlist</a>
+        <a class="nav-item" href="{% url 'learning' %}"><span class="nav-dot"></span>Learning Center</a>
+        <a class="nav-item" href="{% url 'encyclopedia' %}"><span class="nav-dot"></span>Encyclopedia</a>
+        <a class="nav-item" href="{% url 'about' %}"><span class="nav-dot"></span>About</a>
+      </nav>
+    </details>
+  </header>
+
+  <main class="flex-1 px-4 md:px-10 py-6 md:py-10 overflow-x-hidden" style="padding-bottom: 90px;">
+    <div class="page-shell">
+      {% block content %}{% endblock %}
+    </div>
+    <footer style="max-width:1400px;margin:60px auto 0;padding:22px 0 10px;border-top:1px solid var(--sa-border);color:var(--sa-muted);font-size:11.5px;line-height:1.6;">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+        <div><strong style="color:var(--sa-ink);">Not investment advice.</strong> TradeLab is an educational research tool. Data via yfinance. Always do your own research — never invest money you can't afford to lose.</div>
+        <div style="display:flex;gap:14px;">
+          <a href="{% url 'about' %}" style="color:var(--sa-muted);">About</a>
+          <a href="{% url 'privacy' %}" style="color:var(--sa-muted);">Privacy</a>
+        </div>
+      </div>
+    </footer>
+  </main>
+</div>
+
+{{ search_universe|json_script:"search-universe-data" }}
+<script src="{% static 'js/app.js' %}"></script>
+<script>
+(function () {
+  var dataEl = document.getElementById("search-universe-data");
+  if (!dataEl) return;
+  var universe = JSON.parse(dataEl.textContent || "[]");
+  if (!universe.length) return;
+
+  function score(item, q) {
+    var name = item.name.toLowerCase(), tick = item.ticker.toLowerCase();
+    if (tick.startsWith(q)) return 0;
+    if (name.startsWith(q)) return 1;
+    if (tick.includes(q)) return 2;
+    if (name.includes(q)) return 3;
+    return -1;
+  }
+
+  document.querySelectorAll('input[data-autocomplete="ticker"]').forEach(function (input) {
+    var wrap = input.parentElement;
+    if (!wrap.style.position && getComputedStyle(wrap).position === "static") wrap.style.position = "relative";
+    var list = document.createElement("ul");
+    list.className = "hidden absolute left-0 right-0 top-full mt-1 z-20 bg-panel border border-slate-700 rounded-lg shadow-xl max-h-72 overflow-auto text-sm";
+    wrap.appendChild(list);
+
+    var activeIdx = -1, matches = [];
+
+    function render() {
+      if (!matches.length) { list.classList.add("hidden"); list.innerHTML = ""; return; }
+      list.innerHTML = matches.map(function (m, i) {
+        return '<li data-i="' + i + '" class="px-3 py-2 cursor-pointer flex items-center justify-between gap-3 ' +
+          (i === activeIdx ? 'bg-slate-700' : 'hover:bg-slate-800') + '">' +
+          '<span class="text-white">' + m.name + '</span>' +
+          '<span class="text-[11px] text-muted font-mono">' + m.ticker + '</span></li>';
+      }).join("");
+      list.classList.remove("hidden");
+    }
+
+    function update() {
+      var q = input.value.trim().toLowerCase();
+      if (!q) { matches = []; activeIdx = -1; render(); return; }
+      matches = universe
+        .map(function (item) { return { item: item, s: score(item, q) }; })
+        .filter(function (x) { return x.s >= 0; })
+        .sort(function (a, b) { return a.s - b.s; })
+        .slice(0, 8)
+        .map(function (x) { return x.item; });
+      activeIdx = matches.length ? 0 : -1;
+      render();
+    }
+
+    function pick(i) {
+      if (i < 0 || i >= matches.length) return;
+      input.value = matches[i].ticker;
+      matches = []; render();
+      if (input.form && input.form.method.toLowerCase() === "get") input.form.submit();
+    }
+
+    input.addEventListener("input", update);
+    input.addEventListener("focus", update);
+    input.addEventListener("keydown", function (e) {
+      if (list.classList.contains("hidden")) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); activeIdx = (activeIdx + 1) % matches.length; render(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = (activeIdx - 1 + matches.length) % matches.length; render(); }
+      else if (e.key === "Enter") { if (activeIdx >= 0) { e.preventDefault(); pick(activeIdx); } }
+      else if (e.key === "Escape") { matches = []; render(); }
+    });
+    list.addEventListener("mousedown", function (e) {
+      var li = e.target.closest("li[data-i]");
+      if (!li) return;
+      e.preventDefault();
+      pick(parseInt(li.dataset.i, 10));
+    });
+    document.addEventListener("click", function (e) {
+      if (!list.contains(e.target) && e.target !== input) { matches = []; render(); }
+    });
+  });
+})();
+</script>
+<script>
+document.addEventListener("click", function(e) {
+  document.querySelectorAll("[id^='tf-wrap-']").forEach(function(wrap) {
+    var menu = wrap.querySelector(".absolute");
+    if (menu && !menu.classList.contains("hidden") && !wrap.contains(e.target)) {
+      menu.classList.add("hidden");
+    }
+  });
+});
+</script>
+<script>
+(function () {
+  function applyLabel() {
+    var isLight = document.documentElement.classList.contains('light');
+    var icon = document.getElementById('theme-toggle-icon');
+    var label = document.getElementById('theme-toggle-label');
+    if (icon)  icon.textContent  = isLight ? '☀️' : '🌙';
+    if (label) label.textContent = isLight ? 'Light mode' : 'Dark mode';
+  }
+  window.stockappToggleTheme = function () { /* light mode removed */ };
+  document.addEventListener('DOMContentLoaded', applyLabel);
+})();
+</script>
+{% block scripts %}{% endblock %}
+
+<!-- ── Fun layer: keyboard shortcuts + Konami easter egg ── -->
+<style>
+  .kbd-modal {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    animation: tl-fade-up .2s ease-out;
+  }
+  .kbd-modal.open { display: flex; }
+  .kbd-card {
+    max-width: 520px; width: 90%; padding: 28px 32px;
+    background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2));
+    border: 1px solid var(--sa-border2);
+    border-radius: 20px;
+    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.6);
+    color: var(--sa-ink);
+  }
+  .kbd-card h3 { font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 20px; margin-bottom: 16px; }
+  .kbd-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--sa-border); font-size: 13px; }
+  .kbd-row:first-of-type { border-top: none; }
+  .kbd-keys { display: flex; gap: 4px; }
+  .kbd-key {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 3px 9px; border-radius: 6px;
+    background: rgba(255,255,255,0.06); border: 1px solid var(--sa-border2);
+    color: var(--sa-ink); min-width: 22px; text-align: center;
+  }
+  html.light .kbd-key { background: rgba(15,23,42,0.04); }
+  .rupee-rain {
+    position: fixed; top: -40px; font-size: 28px; z-index: 999; pointer-events: none;
+    user-select: none;
+    animation: rupee-fall 3s linear forwards;
+  }
+  @keyframes rupee-fall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+  }
+  .toast {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    z-index: 1001;
+    background: linear-gradient(135deg, var(--sa-accent), var(--sa-accent2));
+    color: #0a0d14; font-weight: 700; font-size: 14px;
+    padding: 12px 22px; border-radius: 999px;
+    box-shadow: 0 12px 32px -6px rgba(52,211,153,0.4);
+    animation: toast-in .4s cubic-bezier(.2,1.5,.4,1);
+  }
+  @keyframes toast-in { from { transform: translate(-50%, 30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+</style>
+
+<!-- ═══ Mobile bottom tab bar (≤768px only) ═══ -->
+<style>
+  .bottom-tabs { display: none; }
+  @media (max-width: 768px) {
+    .bottom-tabs {
+      display: flex;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+      background: linear-gradient(180deg, rgba(15,20,32,0.9), rgba(7,9,15,0.98));
+      border-top: 1px solid var(--sa-border2);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+      justify-content: space-around;
+    }
+    html.light .bottom-tabs { background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,252,0.98)); }
+    .bottom-tabs a {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 8px 4px; border-radius: 10px; color: var(--sa-muted);
+      font-size: 10.5px; font-weight: 600; text-decoration: none;
+    }
+    .bottom-tabs a.on { color: var(--sa-accent); background: rgba(52,211,153,0.1); }
+    .bottom-tabs a .ic { font-size: 18px; line-height: 1; }
+    aside.sidebar, header.topbar { display: none !important; }
+  }
+</style>
+{% with active=request.resolver_match.url_name %}
+<nav class="bottom-tabs">
+  <a href="{% url 'dashboard' %}" class="{% if active == 'dashboard' %}on{% endif %}"><span class="ic">🏠</span><span>Home</span></a>
+  <a href="{% url 'screener' %}"  class="{% if active == 'screener' %}on{% endif %}"><span class="ic">🔎</span><span>Screener</span></a>
+  <a href="{% url 'analysis' %}"  class="{% if active == 'analysis' %}on{% endif %}"><span class="ic">📊</span><span>Analysis</span></a>
+  <a href="{% url 'portfolio' %}" class="{% if active == 'portfolio' %}on{% endif %}"><span class="ic">💼</span><span>Portfolio</span></a>
+  <a href="{% url 'learning' %}"  class="{% if active == 'learning' %}on{% endif %}"><span class="ic">📘</span><span>Learn</span></a>
+</nav>
+{% endwith %}
+
+<!-- ═══ Global Cmd+K search — Spotlight style ═══ -->
+<style>
+  .cmdk-wrap { position: fixed; inset: 0; z-index: 1002; display: none; align-items: flex-start; justify-content: center; padding-top: 14vh;
+               background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); animation: tl-fade-up .18s ease-out; }
+  .cmdk-wrap.open { display: flex; }
+  .cmdk-box { width: min(560px, 92%); border-radius: 18px;
+              background: linear-gradient(180deg, rgba(21,28,44,0.96), rgba(15,20,32,0.98));
+              border: 1px solid var(--sa-border2);
+              box-shadow: 0 40px 80px -20px rgba(0,0,0,0.6);
+              overflow: hidden; }
+  html.light .cmdk-box { background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,1)); }
+  .cmdk-input { width: 100%; border: none; padding: 18px 22px; font-size: 16px;
+                background: transparent; color: var(--sa-ink); font-family: Inter, sans-serif; outline: none; }
+  .cmdk-hint { font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sa-muted);
+               padding: 8px 22px; border-top: 1px solid var(--sa-border); display: flex; gap: 14px; justify-content: space-between; }
+  .cmdk-list { max-height: 50vh; overflow-y: auto; }
+  .cmdk-item { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+               padding: 11px 22px; cursor: pointer; border-top: 1px solid var(--sa-border); }
+  .cmdk-item.sel { background: rgba(52,211,153,0.10); }
+  .cmdk-item .n { font-weight: 500; color: var(--sa-ink); }
+  .cmdk-item .t { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--sa-muted); }
+  .cmdk-item .kind { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sa-accent);
+                     background: rgba(52,211,153,0.10); padding: 2px 8px; border-radius: 999px; }
+</style>
+
+<div class="cmdk-wrap" id="cmdk" onclick="if(event.target===this)window.TradeLabCloseCmdk()">
+  <div class="cmdk-box">
+    <input id="cmdk-input" class="cmdk-input" type="text" placeholder="Search a ticker, or jump to a page…" autocomplete="off" spellcheck="false">
+    <div id="cmdk-list" class="cmdk-list"></div>
+    <div class="cmdk-hint">
+      <span><span class="kbd-key">↑</span> <span class="kbd-key">↓</span> to move &nbsp;·&nbsp; <span class="kbd-key">↵</span> to open &nbsp;·&nbsp; <span class="kbd-key">esc</span> to close</span>
+      <span>Cmd+K anywhere</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var dataEl = document.getElementById("search-universe-data");
+  var universe = [];
+  try { universe = JSON.parse(dataEl.textContent || "[]"); } catch(e) {}
+
+  // Static destinations the user can jump to
+  var PAGES = [
+    { kind: "page", name: "Dashboard",        ticker: "home",     href: "{% url 'dashboard' %}" },
+    { kind: "page", name: "Live / Day Trade", ticker: "live",     href: "{% url 'live' %}" },
+    { kind: "page", name: "Analysis",         ticker: "analysis", href: "{% url 'analysis' %}" },
+    { kind: "page", name: "Commodities",      ticker: "gold",     href: "{% url 'commodities' %}" },
+    { kind: "page", name: "Risk Analyser",    ticker: "risk",     href: "{% url 'risk_analyser' %}" },
+    { kind: "page", name: "Screener",         ticker: "scan",     href: "{% url 'screener' %}" },
+    { kind: "page", name: "Portfolio",        ticker: "folio",    href: "{% url 'portfolio' %}" },
+    { kind: "page", name: "Watchlist",        ticker: "watch",    href: "{% url 'watchlist' %}" },
+    { kind: "page", name: "Learning Center",  ticker: "learn",    href: "{% url 'learning' %}" },
+    { kind: "page", name: "Encyclopedia",     ticker: "enc",      href: "{% url 'encyclopedia' %}" },
+    { kind: "page", name: "About",            ticker: "about",    href: "{% url 'about' %}" }
+  ];
+
+  var input = document.getElementById("cmdk-input");
+  var list  = document.getElementById("cmdk-list");
+  var wrap  = document.getElementById("cmdk");
+  var sel = 0, matches = [];
+
+  function score(item, q) {
+    var n = item.name.toLowerCase(), t = (item.ticker || "").toLowerCase();
+    if (t === q) return -1;
+    if (t.startsWith(q)) return 0;
+    if (n.toLowerCase().startsWith(q)) return 1;
+    if (t.includes(q)) return 2;
+    if (n.toLowerCase().includes(q)) return 3;
+    return -99;
+  }
+
+  function render() {
+    if (!matches.length) { list.innerHTML = '<div style="padding:22px;color:var(--sa-muted);font-size:13px;">No matches. Try another query.</div>'; return; }
+    list.innerHTML = matches.map(function (m, i) {
+      var kindTag = m.kind === "page" ? '<span class="kind">Page</span>' : '<span class="kind">Ticker</span>';
+      return '<div class="cmdk-item ' + (i === sel ? 'sel' : '') + '" data-i="' + i + '">' +
+               '<span class="n">' + m.name + '</span>' +
+               '<span style="display:flex;align-items:center;gap:10px;">' +
+                 '<span class="t">' + (m.kind === 'page' ? '' : m.ticker) + '</span>' +
+                 kindTag +
+               '</span>' +
+             '</div>';
+    }).join("");
+  }
+
+  function update() {
+    var q = input.value.trim().toLowerCase();
+    if (!q) {
+      matches = PAGES.slice(0, 8);
+    } else {
+      var pool = PAGES.concat(universe);
+      matches = pool
+        .map(function (x) { return { x: x, s: score(x, q) }; })
+        .filter(function (r) { return r.s >= 0; })
+        .sort(function (a, b) { return a.s - b.s; })
+        .slice(0, 10)
+        .map(function (r) { return r.x; });
+    }
+    sel = 0;
+    render();
+  }
+
+  function go(item) {
+    if (!item) return;
+    var url;
+    if (item.kind === "page") url = item.href;
+    else url = "{% url 'analysis' %}?ticker=" + encodeURIComponent(item.ticker);
+    window.TradeLabCloseCmdk();
+    window.location.href = url;
+  }
+
+  window.TradeLabOpenCmdk = function () {
+    wrap.classList.add("open");
+    input.value = ""; update();
+    setTimeout(function(){ input.focus(); }, 10);
+  };
+  window.TradeLabCloseCmdk = function () { wrap.classList.remove("open"); };
+
+  input.addEventListener("input", update);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { window.TradeLabCloseCmdk(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); sel = (sel + 1) % Math.max(1, matches.length); render(); }
+    else if (e.key === "ArrowUp")   { e.preventDefault(); sel = (sel - 1 + matches.length) % Math.max(1, matches.length); render(); }
+    else if (e.key === "Enter")     { e.preventDefault(); go(matches[sel]); }
+  });
+  list.addEventListener("click", function (e) {
+    var row = e.target.closest(".cmdk-item");
+    if (row) go(matches[parseInt(row.dataset.i, 10)]);
+  });
+
+  // Global shortcut: Cmd+K / Ctrl+K
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      if (wrap.classList.contains("open")) window.TradeLabCloseCmdk();
+      else window.TradeLabOpenCmdk();
+    }
+  });
+})();
+</script>
+
+<!-- Floating help button (discovery for keyboard shortcuts) -->
+<button id="help-fab" onclick="document.getElementById('kbd-modal').classList.add('open')"
+        aria-label="Show keyboard shortcuts"
+        style="position:fixed;bottom:22px;right:22px;width:42px;height:42px;border-radius:999px;
+               border:1px solid var(--sa-border2);
+               background:linear-gradient(135deg, var(--sa-panel2), var(--sa-panel));
+               backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+               color:var(--sa-muted);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;
+               cursor:pointer;z-index:50;display:flex;align-items:center;justify-content:center;
+               box-shadow: 0 8px 24px -8px rgba(0,0,0,0.4);
+               transition: color .15s, border-color .15s, transform .15s;">?</button>
+<style>
+  #help-fab:hover { color: var(--sa-accent); border-color: var(--sa-accent); transform: scale(1.06); }
+</style>
+
+<div class="kbd-modal" id="kbd-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="kbd-card">
+    <h3>Keyboard shortcuts</h3>
+    <div class="kbd-row"><span>Quick search / jump to page</span><div class="kbd-keys"><span class="kbd-key">⌘</span><span class="kbd-key">K</span></div></div>
+    <div class="kbd-row"><span>Go to Dashboard</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">d</span></div></div>
+    <div class="kbd-row"><span>Go to Screener</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">s</span></div></div>
+    <div class="kbd-row"><span>Go to Analysis</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">a</span></div></div>
+    <div class="kbd-row"><span>Go to Live</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">l</span></div></div>
+    <div class="kbd-row"><span>Go to Portfolio</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">p</span></div></div>
+    <div class="kbd-row"><span>Go to Watchlist</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">w</span></div></div>
+    <div class="kbd-row"><span>Go to Learning</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">e</span></div></div>
+    <div class="kbd-row"><span>Show this panel</span><div class="kbd-keys"><span class="kbd-key">?</span></div></div>
+    <div class="kbd-row" style="color: var(--sa-muted); font-size: 11px; margin-top: 8px;"><span>Press <span class="kbd-key" style="display:inline-block;">↑ ↑ ↓ ↓</span> for a surprise.</span></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var urls = {
+    d: "{% url 'dashboard' %}",
+    s: "{% url 'screener' %}",
+    a: "{% url 'analysis' %}",
+    l: "{% url 'live' %}",
+    p: "{% url 'portfolio' %}",
+    w: "{% url 'watchlist' %}",
+    e: "{% url 'learning' %}"
+  };
+  var pending = null, pendingTimer = null;
+  function isTyping(el) {
+    if (!el) return false;
+    var t = (el.tagName || "").toLowerCase();
+    return t === "input" || t === "textarea" || t === "select" || el.isContentEditable;
+  }
+
+  window.TradeLabToast = function (msg) {
+    var old = document.querySelector(".toast"); if (old) old.remove();
+    var el = document.createElement("div"); el.className = "toast"; el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function () { el.style.transition = "opacity .4s"; el.style.opacity = "0"; setTimeout(function(){ el.remove(); }, 400); }, 2400);
+  };
+
+  // Rupee rain easter egg
+  window.TradeLabRupeeRain = function () {
+    var syms = ["₹", "💸", "📈", "🪙"];
+    for (var i = 0; i < 40; i++) (function (i) {
+      setTimeout(function () {
+        var el = document.createElement("div");
+        el.className = "rupee-rain";
+        el.textContent = syms[Math.floor(Math.random() * syms.length)];
+        el.style.left = Math.random() * 100 + "vw";
+        el.style.animationDuration = (2 + Math.random() * 2) + "s";
+        el.style.fontSize = (20 + Math.random() * 28) + "px";
+        document.body.appendChild(el);
+        setTimeout(function () { el.remove(); }, 4500);
+      }, i * 60);
+    })(i);
+  };
+
+  // Confetti for quiz wins — reusable
+  window.TradeLabConfetti = function () {
+    var colors = ["#34d399", "#fbbf24", "#60a5fa", "#fb7185", "#c4b5fd"];
+    for (var i = 0; i < 80; i++) (function (i) {
+      setTimeout(function () {
+        var el = document.createElement("div");
+        el.style.cssText = "position:fixed;top:40%;left:50%;width:10px;height:14px;z-index:999;pointer-events:none;border-radius:2px;" +
+          "background:" + colors[Math.floor(Math.random()*colors.length)] + ";";
+        var ax = (Math.random() - 0.5) * 600;
+        var ay = -200 - Math.random() * 400;
+        var rot = Math.random() * 720 - 360;
+        el.animate([
+          { transform: "translate(0,0) rotate(0)", opacity: 1 },
+          { transform: "translate(" + ax + "px," + ay + "px) rotate(" + rot + "deg)", opacity: 1, offset: 0.2 },
+          { transform: "translate(" + (ax * 1.5) + "px,600px) rotate(" + (rot * 2) + "deg)", opacity: 0 }
+        ], { duration: 1800 + Math.random() * 800, easing: "cubic-bezier(.2,.8,.4,1)" }).onfinish = function () { el.remove(); };
+        document.body.appendChild(el);
+      }, i * 8);
+    })(i);
+  };
+
+  // ── Global key handlers ──
+  var konami = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown"];
+  var kIdx = 0;
+
+  document.addEventListener("keydown", function (e) {
+    if (isTyping(e.target)) return;
+
+    // Konami
+    var want = konami[kIdx];
+    if (e.key === want || e.key.toLowerCase() === (want || "").toLowerCase()) {
+      kIdx++;
+      if (kIdx === konami.length) {
+        kIdx = 0;
+        window.TradeLabRupeeRain();
+        window.TradeLabToast("💸 Rupees are raining. You found the secret.");
+      }
+    } else { kIdx = 0; }
+
+    // ? — show shortcuts
+    if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+      e.preventDefault();
+      document.getElementById("kbd-modal").classList.toggle("open");
+      return;
+    }
+    // Escape — close modals
+    if (e.key === "Escape") {
+      document.getElementById("kbd-modal").classList.remove("open");
+      return;
+    }
+    // (theme toggle removed — light mode is gone)
+    // g then <letter> — navigate
+    if (e.key === "g" || e.key === "G") {
+      pending = "g";
+      clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(function () { pending = null; }, 1200);
+      return;
+    }
+    if (pending === "g") {
+      var k = e.key.toLowerCase();
+      if (urls[k]) { window.location.href = urls[k]; }
+      pending = null;
+    }
+  });
+})();
+</script>
+
+<!-- ═══ Custom date picker — replaces native input[type="date"] ═══ -->
+<style>
+  .tl-date-wrap { position: relative; }
+  .tl-date-display {
+    background-color: var(--sa-panel2);
+    border: 1px solid var(--sa-border2);
+    border-radius: 10px;
+    color: var(--sa-ink);
+    padding: 10px 38px 10px 14px;
+    font-size: 13px;
+    font-family: Inter, system-ui, sans-serif;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    transition: border-color .15s;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a94a7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  .tl-date-display:hover, .tl-date-display.open { border-color: var(--sa-accent); }
+  .tl-date-display.placeholder { color: var(--sa-muted); }
+  html.light .tl-date-display {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
+  }
+  .tl-cal {
+    position: fixed; z-index: 1010;
+    width: 280px; padding: 14px;
+    background: linear-gradient(180deg, var(--sa-card-bg), var(--sa-card-bg2));
+    border: 1px solid var(--sa-border2);
+    border-radius: 14px;
+    box-shadow: 0 20px 50px -12px rgba(0,0,0,0.55);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    display: none;
+    animation: tl-fade-up .18s ease-out;
+  }
+  .tl-cal.open { display: block; }
+  .tl-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 6px; }
+  .tl-cal-nav {
+    background: transparent; border: 1px solid var(--sa-border);
+    color: var(--sa-muted); width: 28px; height: 28px;
+    border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all .15s; font-size: 14px; line-height: 1;
+  }
+  .tl-cal-nav:hover { color: var(--sa-accent); border-color: var(--sa-accent); }
+  .tl-cal-title {
+    flex: 1; display: flex; gap: 6px; justify-content: center; align-items: center;
+  }
+  .tl-cal-title select {
+    min-width: 0; padding: 4px 24px 4px 8px; font-size: 12px;
+    font-family: Inter, sans-serif;
+    background-position: right 6px center;
+  }
+  .tl-cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+  }
+  .tl-cal-dow {
+    text-align: center; font-size: 10px; color: var(--sa-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 6px 0 8px;
+  }
+  .tl-cal-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 12.5px; color: var(--sa-ink); border-radius: 8px; cursor: pointer;
+    background: transparent; border: none;
+    transition: background .12s, color .12s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tl-cal-day:hover { background: var(--sa-nav-hover); color: var(--sa-accent); }
+  .tl-cal-day.other { color: var(--sa-muted); opacity: 0.45; }
+  .tl-cal-day.today { box-shadow: inset 0 0 0 1px var(--sa-border2); }
+  .tl-cal-day.selected { background: var(--sa-accent); color: #07090f; font-weight: 700; }
+  .tl-cal-day:disabled { opacity: 0.25; cursor: not-allowed; }
+  .tl-cal-day:disabled:hover { background: transparent; color: var(--sa-ink); }
+  .tl-cal-foot {
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sa-border);
+    display: flex; gap: 8px; justify-content: space-between;
+  }
+  .tl-cal-foot button {
+    flex: 1; background: transparent; border: 1px solid var(--sa-border);
+    color: var(--sa-muted); padding: 6px 10px; border-radius: 8px;
+    font-size: 11.5px; cursor: pointer; transition: all .15s;
+  }
+  .tl-cal-foot button:hover { color: var(--sa-accent); border-color: var(--sa-accent); }
+</style>
+
+<script>
+(function () {
+  var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function fmtISO(d) { return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+  function parseISO(s) {
+    if (!s) return null;
+    var p = s.split("-");
+    if (p.length !== 3) return null;
+    var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1, parseInt(p[2],10));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function fmtDisplay(d) {
+    if (!d) return "";
+    return pad(d.getDate()) + " " + MONTHS[d.getMonth()].slice(0,3) + " " + d.getFullYear();
+  }
+  function sameDay(a, b) { return a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+  function enhance(input) {
+    if (input.dataset.tlEnhanced) return;
+    input.dataset.tlEnhanced = "1";
+
+    var minDate = parseISO(input.getAttribute("min"));
+    var maxDate = parseISO(input.getAttribute("max"));
+    var selected = parseISO(input.value);
+    var today = new Date(); today.setHours(0,0,0,0);
+    var view = selected ? new Date(selected) : new Date(today);
+    view.setDate(1);
+
+    // Hide native input, build wrapper
+    var wrap = document.createElement("div");
+    wrap.className = "tl-date-wrap";
+    input.parentNode.insertBefore(wrap, input);
+    input.style.display = "none";
+    input.type = "hidden";
+    wrap.appendChild(input);
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tl-date-display" + (selected ? "" : " placeholder");
+    btn.textContent = selected ? fmtDisplay(selected) : (input.getAttribute("placeholder") || "Select date");
+    wrap.appendChild(btn);
+
+    var cal = document.createElement("div");
+    cal.className = "tl-cal";
+    document.body.appendChild(cal);
+
+    function position() {
+      var r = btn.getBoundingClientRect();
+      var calW = 280, calH = cal.offsetHeight || 320;
+      var left = r.left;
+      var top = r.bottom + 6;
+      if (left + calW > window.innerWidth - 8) left = window.innerWidth - calW - 8;
+      if (left < 8) left = 8;
+      if (top + calH > window.innerHeight - 8) top = Math.max(8, r.top - calH - 6);
+      cal.style.left = left + "px";
+      cal.style.top  = top  + "px";
+    }
+
+    function render() {
+      var year = view.getFullYear(), month = view.getMonth();
+      var firstDow = new Date(year, month, 1).getDay();
+      var daysInMonth = new Date(year, month+1, 0).getDate();
+      var prevDays = new Date(year, month, 0).getDate();
+
+      var minYear = minDate ? minDate.getFullYear() : 1970;
+      var maxYear = maxDate ? maxDate.getFullYear() : (today.getFullYear() + 5);
+      var yearOpts = "";
+      for (var y = maxYear; y >= minYear; y--) yearOpts += '<option value="'+y+'"'+(y===year?' selected':'')+'>'+y+'</option>';
+      var monthOpts = MONTHS.map(function(m, i){ return '<option value="'+i+'"'+(i===month?' selected':'')+'>'+m+'</option>'; }).join("");
+
+      var html = '<div class="tl-cal-head">' +
+        '<button type="button" class="tl-cal-nav" data-act="prev" aria-label="Previous month">‹</button>' +
+        '<div class="tl-cal-title">' +
+          '<select data-act="month">'+monthOpts+'</select>' +
+          '<select data-act="year">'+yearOpts+'</select>' +
+        '</div>' +
+        '<button type="button" class="tl-cal-nav" data-act="next" aria-label="Next month">›</button>' +
+      '</div>';
+
+      html += '<div class="tl-cal-grid">';
+      DOW.forEach(function(d){ html += '<div class="tl-cal-dow">'+d+'</div>'; });
+
+      // Leading days (prev month)
+      for (var i = firstDow - 1; i >= 0; i--) {
+        html += '<button type="button" class="tl-cal-day other" disabled>'+(prevDays-i)+'</button>';
+      }
+      // This month
+      for (var d = 1; d <= daysInMonth; d++) {
+        var date = new Date(year, month, d);
+        var cls = "tl-cal-day";
+        if (sameDay(date, today)) cls += " today";
+        if (sameDay(date, selected)) cls += " selected";
+        var dis = (minDate && date < minDate) || (maxDate && date > maxDate);
+        html += '<button type="button" class="'+cls+'" data-d="'+d+'"'+(dis?' disabled':'')+'>'+d+'</button>';
+      }
+      // Trailing days
+      var totalCells = firstDow + daysInMonth;
+      var trailing = (7 - (totalCells % 7)) % 7;
+      for (var t = 1; t <= trailing; t++) {
+        html += '<button type="button" class="tl-cal-day other" disabled>'+t+'</button>';
+      }
+      html += '</div>';
+
+      html += '<div class="tl-cal-foot">' +
+        '<button type="button" data-act="today">Today</button>' +
+        '<button type="button" data-act="clear">Clear</button>' +
+      '</div>';
+
+      cal.innerHTML = html;
+    }
+
+    function open() {
+      render();
+      cal.classList.add("open"); btn.classList.add("open");
+      position();
+      window.addEventListener("scroll", position, true);
+      window.addEventListener("resize", position);
+    }
+    function close() {
+      cal.classList.remove("open"); btn.classList.remove("open");
+      window.removeEventListener("scroll", position, true);
+      window.removeEventListener("resize", position);
+    }
+
+    function pick(date) {
+      selected = date;
+      input.value = date ? fmtISO(date) : "";
+      btn.textContent = date ? fmtDisplay(date) : (input.getAttribute("placeholder") || "Select date");
+      btn.classList.toggle("placeholder", !date);
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      close();
+    }
+
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      if (cal.classList.contains("open")) close(); else open();
+    });
+
+    cal.addEventListener("click", function(e) {
+      var t = e.target;
+      var act = t.dataset.act;
+      if (act === "prev") { view.setMonth(view.getMonth()-1); render(); return; }
+      if (act === "next") { view.setMonth(view.getMonth()+1); render(); return; }
+      if (act === "today") { view = new Date(today); view.setDate(1); pick(new Date(today)); return; }
+      if (act === "clear") { pick(null); return; }
+      if (t.dataset.d) {
+        var d = parseInt(t.dataset.d, 10);
+        pick(new Date(view.getFullYear(), view.getMonth(), d));
+      }
+    });
+    cal.addEventListener("change", function(e) {
+      var t = e.target;
+      if (t.dataset.act === "month") { view.setMonth(parseInt(t.value,10)); render(); }
+      else if (t.dataset.act === "year") { view.setFullYear(parseInt(t.value,10)); render(); }
+    });
+
+    document.addEventListener("click", function(e) {
+      if (!wrap.contains(e.target) && !cal.contains(e.target)) close();
+    });
+  }
+
+  function scan() {
+    document.querySelectorAll('input[type="date"]').forEach(enhance);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan);
+  else scan();
+})();
+</script>
+
+<!-- First-visit welcome: Guest vs Sign in -->
+{% if not user.is_authenticated %}
+<div id="welcome-modal" style="position:fixed;inset:0;z-index:1005;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);padding:20px;">
+  <div style="max-width:440px;width:100%;padding:32px 28px;background:linear-gradient(180deg,var(--sa-card-bg),var(--sa-card-bg2));border:1px solid var(--sa-border2);border-radius:20px;box-shadow:0 40px 80px -20px rgba(0,0,0,0.6);text-align:center;">
+    <div class="brand" style="justify-content:center;display:flex;font-size:1.8rem;margin-bottom:6px;">
+      <span class="b1">₹</span><span class="b2">trade</span><span class="b3">Lab</span>
+    </div>
+    <p style="color:var(--sa-muted);font-size:13px;margin-bottom:22px;">Indian markets · planning desk</p>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;margin-bottom:8px;color:var(--sa-ink);">Welcome</h3>
+    <p style="color:var(--sa-muted);font-size:13.5px;line-height:1.55;margin-bottom:22px;">
+      Sign in to save your portfolio, watchlist, and quiz progress — or continue as a guest to explore.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <a href="{% url 'account_login' %}" style="display:block;padding:11px 18px;border-radius:11px;background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;font-weight:700;font-size:14px;text-decoration:none;">Sign in</a>
+      <a href="{% url 'account_signup' %}" style="display:block;padding:11px 18px;border-radius:11px;border:1px solid var(--sa-border2);color:var(--sa-ink);font-weight:600;font-size:14px;text-decoration:none;">Create account</a>
+      <button type="button" id="welcome-guest" style="background:transparent;border:none;color:var(--sa-muted);font-size:12.5px;padding:8px;cursor:pointer;margin-top:2px;">Continue as guest →</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  try {
+    if (!localStorage.getItem('tradelab-welcome-seen')) {
+      var m = document.getElementById('welcome-modal');
+      if (m) m.style.display = 'flex';
+    }
+  } catch (_) {}
+  var btn = document.getElementById('welcome-guest');
+  if (btn) btn.addEventListener('click', function () {
+    try { localStorage.setItem('tradelab-welcome-seen', '1'); } catch (_) {}
+    var m = document.getElementById('welcome-modal');
+    if (m) m.style.display = 'none';
+  });
+})();
+</script>
+{% endif %}
+
+</body>
+</html>

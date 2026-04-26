@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Not Found · TradeLab{% endblock %}
+{% block content %}
+<div style="max-width:620px;margin:60px auto 0;text-align:center;">
+  <div class="eyebrow mb-4">404 · Not Found</div>
+  <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2.4rem,5vw,3.6rem);line-height:1;letter-spacing:-0.02em;">
+    This page is as <span class="gradient-text">rare as a clean 10-bagger</span>.
+  </h2>
+  <p style="color:var(--sa-muted);font-size:15px;margin-top:18px;max-width:52ch;margin-left:auto;margin-right:auto;line-height:1.6;">
+    The URL you followed doesn't exist — maybe a typo in the ticker, or a page we renamed. Press <span class="kbd-key" style="padding:3px 8px;border-radius:6px;border:1px solid var(--sa-border2);font-family:'JetBrains Mono',monospace;font-size:11px;">⌘ K</span> to search, or head back to the dashboard.
+  </p>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:30px;flex-wrap:wrap;">
+    <a href="{% url 'dashboard' %}" style="background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none;">← Dashboard</a>
+    <button onclick="window.TradeLabOpenCmdk&&window.TradeLabOpenCmdk()" style="background:transparent;border:1px solid var(--sa-border2);color:var(--sa-ink);padding:12px 22px;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;">🔎 Search a ticker</button>
+  </div>
+  <blockquote style="margin:50px auto 0;padding:16px 22px;border-left:3px solid var(--sa-accent);font-style:italic;color:var(--sa-muted);max-width:50ch;font-size:14px;line-height:1.6;text-align:left;">
+    "Markets can remain irrational longer than you can remain solvent." — Keynes
+  </blockquote>
+</div>
+{% endblock %}

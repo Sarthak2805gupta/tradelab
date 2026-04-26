@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Encyclopedia · TradeLab{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'encyclopedia/style.css' %}">
+<script>document.documentElement.classList.add("encyclopedia-page"); document.body.classList.add("encyclopedia-page");</script>
+<style>
+  /* Kill the noise overlay on this page (also disabled when html has the class, so applies pre-paint) */
+  html.encyclopedia-page body::before {
+    display: none !important;
+  }
+</style>
+<style>
+  /* ── Embed overrides: encyclopedia UI now lives inside Django's base.html ── */
+
+  /* Palette → match TradeLab's Django theme.
+     No !important here — let html.light overrides from style.css actually win. */
+  :root {
+    background: #162244;
+    --s1: #121826;
+    --s2: #1a2234;
+    --s3: #1e2840;
+    --b1: rgba(255, 255, 255, 0.06);
+    --b2: rgba(255, 255, 255, 0.08);
+    --b3: rgba(255, 255, 255, 0.12);
+    --tx: #e6ebf3;
+    --tx2: #a0a8c0;
+    --tx3: #8a94a7;
+    --fa: #2a3050;
+    --trend: #10b981;
+  }
+
+  html.light {
+    /* Follow the site-wide light palette from base.html. These override
+       whatever style.css already defined for html.light. */
+    --bg: transparent;
+    --s1: #ffffff;
+    --s2: #f1f5f9;
+    --s3: #e2e8f0;
+    --b1: rgba(15, 23, 42, 0.08);
+    --b2: rgba(15, 23, 42, 0.12);
+    --b3: rgba(15, 23, 42, 0.18);
+    --tx: #0f172a;
+    --tx2: #334155;
+    --tx3: #64748b;
+    --fa: #cbd5e1;
+    --trend: #059669;
+  }
+
+  .enc-wrapper {
+    background: transparent;
+    position: relative;
+    z-index: 5;
+    isolation: isolate;
+  }
+
+  .enc-wrapper,
+  .enc-wrapper * {
+    opacity: 1 !important;
+    mix-blend-mode: normal !important;
+  }
+
+  .enc-wrapper .icard::before {
+    display: none !important;
+  }
+
+  /* Disable the page-wide noise overlay on the encyclopedia page only */
+  body.encyclopedia-page::before {
+    display: none !important;
+  }
+
+  /* Re-scope the encyclopedia sidebar so it's a flex child inside Django's main,
+     not a fixed full-viewport sidebar competing with base.html's own sidebar. */
+  .enc-wrapper {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    min-height: 60vh;
+  }
+
+  .enc-wrapper #sidebar {
+    width: 240px !important;
+    height: auto !important;
+    max-height: calc(100vh - 80px);
+    background: var(--sa-panel2) !important;
+    border: 1px solid var(--sa-border2) !important;
+    border-radius: 16px;
+    flex-shrink: 0;
+    position: sticky !important;
+    top: 16px !important;
+    overflow-y: auto;
+  }
+
+  .enc-wrapper #main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .enc-wrapper #topbar {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 0 14px 0 !important;
+    border-bottom: 1px solid var(--b1);
+    margin-bottom: 16px;
+  }
+
+  .enc-wrapper #content {
+    padding: 0 !important;
+  }
+
+  /* Typography → match TradeLab */
+  .enc-wrapper,
+  .enc-wrapper #main,
+  .enc-wrapper #sidebar,
+  .enc-wrapper input,
+  .enc-wrapper button {
+    font-family: 'Inter', system-ui, sans-serif !important;
+  }
+
+  .enc-wrapper .sidebar-logo h1,
+  .enc-wrapper .s-stat-n,
+  .enc-wrapper .modal-title,
+  .enc-wrapper h1,
+  .enc-wrapper h2,
+  .enc-wrapper h3 {
+    font-family: 'Space Grotesk', 'Inter', sans-serif !important;
+    font-style: normal !important;
+  }
+
+  .enc-wrapper .sidebar-logo h1 em {
+    font-style: normal !important;
+    color: var(--trend);
+  }
+
+  /* Modal stays viewport-overlay — keep as-is */
+
+  @media (max-width: 900px) {
+    .enc-wrapper {
+      flex-direction: column;
+    }
+
+    .enc-wrapper #sidebar {
+      width: 100% !important;
+      position: static !important;
+    }
+  }
+
+  /* Force bright, bold, site-consistent typography inside the encyclopedia.
+     The encyclopedia's own style.css uses DM Sans / DM Serif Display which
+     rendered faint against the new base — use Space Grotesk + explicit color. */
+  .enc-wrapper .sidebar-logo h1 {
+    font-family: 'Space Grotesk', system-ui, sans-serif !important;
+    font-weight: 700 !important;
+    font-style: normal !important;
+    font-size: 18px !important;
+    letter-spacing: -0.01em !important;
+    color: var(--sa-ink) !important;
+  }
+
+  .enc-wrapper .sidebar-logo h1 em {
+    font-style: normal !important;
+    color: var(--sa-accent) !important;
+  }
+
+  .enc-wrapper .sidebar-logo p {
+    color: var(--sa-muted) !important;
+  }
+
+  .enc-wrapper .s-stat-n {
+    font-family: 'Space Grotesk', system-ui, sans-serif !important;
+    color: var(--sa-ink) !important;
+    font-weight: 700 !important;
+  }
+
+  .enc-wrapper .section-title {
+    font-family: 'Space Grotesk', system-ui, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    color: var(--sa-ink) !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .enc-wrapper .section-desc {
+    color: var(--sa-muted) !important;
+  }
+
+  .enc-wrapper .nav-section-title {
+    color: var(--sa-muted) !important;
+    font-weight: 600 !important;
+  }
+
+  .enc-wrapper .card-name {
+    color: var(--sa-ink) !important;
+    font-weight: 600 !important;
+  }
+
+  .enc-wrapper .card-desc {
+    color: var(--sa-muted) !important;
+  }
+
+  .enc-wrapper .empty-title,
+  .enc-wrapper .modal-title {
+    font-family: 'Space Grotesk', system-ui, sans-serif !important;
+    color: var(--sa-ink) !important;
+    font-weight: 700 !important;
+  }
+
+  .enc-wrapper .icard {
+    background: var(--sa-panel2) !important;
+    border: 1px solid var(--sa-border2) !important;
+    border-radius: 14px !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 20px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  html.light .enc-wrapper .icard {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -10px rgba(15, 23, 42, 0.1);
+  }
+
+  .enc-wrapper .icard:hover {
+    border-color: var(--sa-accent) !important;
+    transform: translateY(-2px);
+  }
+
+  .enc-wrapper .icard .card-name {
+    color: var(--sa-ink) !important;
+    opacity: 1 !important;
+  }
+
+  .enc-wrapper .icard .card-desc {
+    color: var(--sa-muted) !important;
+    opacity: 1 !important;
+  }
+
+  .enc-wrapper #search {
+    background: var(--sa-panel2) !important;
+    border: 1px solid var(--sa-border2) !important;
+    color: var(--sa-ink) !important;
+    border-radius: 10px !important;
+    padding: 10px 14px 10px 38px !important;
+    font-size: 13px !important;
+  }
+
+  .enc-wrapper #search:focus {
+    border-color: var(--sa-accent) !important;
+  }
+
+  .enc-wrapper .search-icon {
+    color: var(--sa-muted);
+  }
+
+  .enc-wrapper #sidebar,
+  .enc-wrapper .nav-item,
+  .enc-wrapper .s-stat,
+  .enc-wrapper .sidebar-stats,
+  .enc-wrapper #topbar,
+  .enc-wrapper .section-count,
+  .enc-wrapper .fpill {
+    background: transparent !important;
+  }
+
+  .enc-wrapper .nav-item {
+    border-left: none !important;
+    border-radius: 8px !important;
+    margin: 0 8px !important;
+    padding: 7px 12px !important;
+    color: var(--sa-muted) !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
+    font-weight: 500 !important;
+  }
+
+  .enc-wrapper .nav-item:hover {
+    background: var(--sa-nav-hover) !important;
+    color: var(--sa-ink) !important;
+  }
+
+  .enc-wrapper .nav-item.active {
+    background: var(--sa-nav-active) !important;
+    color: var(--sa-accent) !important;
+    font-weight: 600 !important;
+  }
+
+  .enc-wrapper .nav-count {
+    color: var(--sa-muted) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+
+  .enc-wrapper .nav-section-title {
+    padding: 0 20px !important;
+  }
+
+  /* Force bright page title + section titles regardless of cascade */
+  [data-enc-head] h2 {
+    color: #e6ebf3 !important;
+    font-family: 'Space Grotesk', system-ui, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: clamp(1.7rem, 2.2vw, 2.25rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  html.light [data-enc-head] h2 {
+    color: #0f172a !important;
+  }
+
+  [data-enc-head] p {
+    color: var(--sa-muted) !important;
+  }
+
+  .enc-wrapper .section-header {
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .enc-wrapper .section-title,
+  .enc-wrapper .section-header .section-title {
+    color: #e6ebf3 !important;
+    font-size: 20px !important;
+    opacity: 1 !important;
+  }
+
+  html.light .enc-wrapper .section-title {
+    color: #0f172a !important;
+  }
+
+  .enc-wrapper .section-desc {
+    color: var(--sa-muted) !important;
+    opacity: 1 !important;
+  }
+
+  .enc-wrapper #search::placeholder {
+    color: var(--sa-muted) !important;
+  }
+
+  .enc-wrapper .s-stat-l {
+    color: var(--sa-muted) !important;
+    opacity: 1 !important;
+  }
+
+  .enc-wrapper .nav-section-title,
+  .enc-wrapper .nav-count,
+  .enc-wrapper .sidebar-logo p,
+  .enc-wrapper .card-desc,
+  .enc-wrapper .section-desc {
+    opacity: 1 !important;
+  }
+
+  .enc-wrapper .empty-title,
+  .enc-wrapper .empty p {
+    color: var(--sa-ink) !important;
+  }
+
+  /* Filter pills — match TradeLab look */
+  .enc-wrapper .fpill {
+    background: var(--sa-panel2) !important;
+    border: 1px solid var(--sa-border) !important;
+    color: var(--sa-muted) !important;
+  }
+
+  .enc-wrapper .fpill:hover {
+    color: var(--sa-ink) !important;
+    border-color: var(--sa-border2) !important;
+  }
+
+  .enc-wrapper .fpill.on {
+    background: var(--sa-accent) !important;
+    color: #07090f !important;
+    border-color: var(--sa-accent) !important;
+    font-weight: 700 !important;
+  }
+
+  .enc-wrapper .section-count {
+    background: var(--sa-panel2) !important;
+    color: var(--sa-muted) !important;
+    border: 1px solid var(--sa-border) !important;
+  }
+</style>
+
+<div class="page-head" data-enc-head>
+  <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">Encyclopedia</h2>
+  <p>Indicators, strategies, patterns, and the full glossary — one reference, searchable.</p>
+</div>
+
+<div class="enc-wrapper">
+  <!-- SIDEBAR (categories) -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <h1>Trading <em>Encyclopedia</em></h1>
+      <p>NSE India — Complete Reference</p>
+    </div>
+    <div class="sidebar-stats">
+      <div class="s-stat">
+        <div class="s-stat-n" id="total-count">0</div>
+        <div class="s-stat-l">Items</div>
+      </div>
+      <div class="s-stat">
+        <div class="s-stat-n">10</div>
+        <div class="s-stat-l">Categories</div>
+      </div>
+      <div class="s-stat">
+        <div class="s-stat-n">3</div>
+        <div class="s-stat-l">Files</div>
+      </div>
+    </div>
+    <div id="nav-links"></div>
+  </nav>
+
+  <!-- MAIN -->
+  <div id="main">
+    <div id="topbar">
+      <div class="search-wrap">
+        <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+          viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <input id="search" type="text" placeholder="Search indicators, strategies, glossary terms…">
+      </div>
+      <div class="filter-pills" id="filter-pills"></div>
+    </div>
+
+    <div id="content">
+      <div id="empty">
+        <div class="empty-title">Nothing found</div>
+        <p>Try a different search term</p>
+      </div>
+      <div id="sections"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <button class="modal-close" id="modal-close">✕</button>
+      <div class="modal-badge" id="modal-badge"></div>
+      <div class="modal-title" id="modal-title"></div>
+      <div class="modal-subtitle" id="modal-subtitle"></div>
+      <div class="modal-tags" id="modal-tags"></div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-tabs" id="modal-tabs"></div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{% static 'encyclopedia/data.js' %}"></script>
+<script src="{% static 'encyclopedia/data_part3.js' %}"></script>
+<script src="{% static 'encyclopedia/data_glossary.js' %}"></script>
+<script src="{% static 'encyclopedia/charts.js' %}"></script>
+<script src="{% static 'encyclopedia/app.js' %}"></script>
+{% endblock %}

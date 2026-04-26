@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Portfolio · TradeLab{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6 fade-in flex-wrap gap-3">
+  <div class="page-head" style="margin-bottom:0;">
+    <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">Portfolio <span class="gradient-text">Tracker</span></h2>
+    <p>Track holdings, P&amp;L, and allocation.</p>
+  </div>
+  <a href="{% url 'portfolio_export' %}" style="background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;padding:10px 18px;border-radius:10px;font-weight:700;font-size:14px;">↓ Export CSV</a>
+</div>
+
+<section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 stagger">
+  <div class="card card-hover spotlight p-5" onmousemove="this.style.setProperty('--mx',event.offsetX+'px');this.style.setProperty('--my',event.offsetY+'px');">
+    <div class="eyebrow mb-2">Invested</div>
+    <div class="num-big text-3xl" data-count="{{ totals.invested|floatformat:2 }}" data-prefix="₹">₹{{ totals.invested|inr:2 }}</div>
+  </div>
+  <div class="card card-hover spotlight p-5" onmousemove="this.style.setProperty('--mx',event.offsetX+'px');this.style.setProperty('--my',event.offsetY+'px');">
+    <div class="eyebrow mb-2">Current Value</div>
+    <div class="num-big text-3xl" data-count="{{ totals.current|floatformat:2 }}" data-prefix="₹">₹{{ totals.current|inr:2 }}</div>
+  </div>
+  <div class="card card-hover spotlight p-5" onmousemove="this.style.setProperty('--mx',event.offsetX+'px');this.style.setProperty('--my',event.offsetY+'px');">
+    <div class="eyebrow mb-2">Unrealised P&amp;L</div>
+    <div class="num-big text-3xl {% if totals.pnl >= 0 %}text-accent{% else %}text-danger{% endif %}" data-count="{{ totals.pnl|floatformat:2 }}" data-prefix="₹">₹{{ totals.pnl|inr:2 }}</div>
+    <div class="text-xs font-mono mt-2 {% if totals.pnl >= 0 %}text-accent{% else %}text-danger{% endif %}">
+      {% if totals.pnl >= 0 %}▲ +{% else %}▼ {% endif %}{{ totals.pnl_pct|floatformat:2 }}%
+    </div>
+  </div>
+</section>
+<script>
+(function () {
+  function animateCount(el) {
+    var raw = el.dataset.count, prefix = el.dataset.prefix || "";
+    var target = parseFloat(String(raw).replace(/,/g, ""));
+    if (!isFinite(target)) return;
+    var decimals = (String(raw).split(".")[1] || "").length;
+    var start = performance.now(), dur = 1100;
+    function fmt(v) { var s = v.toFixed(decimals); if (decimals === 0) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ","); return prefix + s; }
+    function step(t) { var p = Math.min(1,(t-start)/dur); el.textContent = fmt(target*(1-Math.pow(1-p,3))); if (p<1) requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  }
+  var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ animateCount(e.target); io.unobserve(e.target);}});},{threshold:0.4});
+  document.querySelectorAll('[data-count]').forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+  <div class="bg-panel rounded-xl p-5 border border-slate-800 lg:col-span-2 overflow-x-auto">
+  <h3 class="font-semibold mb-3">Holdings</h3>
+  <table class="w-full text-sm">
+  <thead class="text-muted text-xs uppercase">
+  <tr><th class="text-left py-2">Ticker</th><th>Qty</th><th>Buy</th><th>Now</th><th>P&L</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for h in holdings %}
+  <tr class="border-t border-slate-800 cursor-pointer hover:bg-panel2/40 transition"
+  onclick="toggleHistory('{{ h.row.ticker }}', '{{ h.row.date_bought|date:'Y-m-d' }}', {{ h.row.buy_price }}, this)">
+  <td class="py-2">
+  <div class="flex items-center gap-2">
+  <span class="text-[10px] text-muted">▶</span>
+  <a class="hover:text-accent" href="{% url 'analysis' %}?ticker={{ h.row.ticker }}" onclick="event.stopPropagation()">{{ h.row.ticker }}</a>
+  </div>
+  </td>
+  <td class="text-center">{{ h.row.quantity }}</td>
+  <td class="text-center">₹{{ h.row.buy_price }}</td>
+  <td class="text-center">₹{{ h.current_price }}</td>
+  <td class="text-center {% if h.pnl >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  ₹{{ h.pnl|inr:2 }} ({{ h.pnl_pct|floatformat:1 }}%)
+  </td>
+  <td class="text-right">
+  <form method="post" action="{% url 'portfolio_delete' h.row.pk %}" onclick="event.stopPropagation()">{% csrf_token %}
+  <button class="text-danger text-xs">Delete</button>
+  </form>
+  </td>
+  </tr>
+  <tr class="hidden" id="history-row-{{ h.row.ticker }}">
+  <td colspan="6" class="p-0">
+  <div class="bg-panel2 p-4 border-t border-slate-700">
+  <div class="flex items-center justify-between mb-3">
+  <h4 class="text-sm font-semibold">{{ h.row.ticker }} — Price Journey since {{ h.row.date_bought|date:'d M Y' }}</h4>
+  <span class="text-[10px] text-muted">Click row to collapse</span>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="lg:col-span-2">
+  <canvas id="chart-{{ h.row.ticker }}" height="180"></canvas>
+  </div>
+  <div id="milestones-{{ h.row.ticker }}" class="text-xs space-y-2">
+  <div class="text-muted italic">Loading milestones...</div>
+  </div>
+  </div>
+  </div>
+  </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6" class="text-muted py-4 text-center">No holdings yet — add one below.</td></tr>
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+
+  <div class="bg-panel rounded-xl p-5 border border-slate-800">
+  <h3 class="font-semibold mb-3">Allocation</h3>
+  <canvas id="allocChart"></canvas>
+  </div>
+</section>
+
+<section class="bg-panel rounded-xl p-5 border border-slate-800">
+  <h3 class="font-semibold mb-3">Add Holding</h3>
+  <form method="post" action="{% url 'portfolio_add' %}" class="grid grid-cols-1 sm:grid-cols-5 gap-3 text-sm" autocomplete="off">
+  {% csrf_token %}
+  <div class="relative">
+  <input name="ticker" placeholder="e.g. Reliance, HDFC Bank" required
+  class="w-full bg-panel2 rounded px-3 py-2 border border-slate-700 font-mono"
+  data-autocomplete="ticker" autocomplete="off" spellcheck="false" />
+  </div>
+  <input name="buy_price" type="number" step="0.01" placeholder="Buy price" required class="bg-panel2 rounded px-3 py-2 border border-slate-700" />
+  <input name="quantity" type="number" placeholder="Quantity" required class="bg-panel2 rounded px-3 py-2 border border-slate-700" />
+  <input name="date_bought" type="date" value="{{ today }}" class="bg-panel2 rounded px-3 py-2 border border-slate-700" />
+  <button class="bg-accent text-base font-semibold rounded px-4">Add</button>
+  </form>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+<script>
+  // Allocation pie
+  const pie = {{ pie|safe }};
+  if (pie.length) {
+  new Chart(document.getElementById("allocChart"), {
+  type: "doughnut",
+  data: {
+  labels: pie.map(p => p.label),
+  datasets: [{ data: pie.map(p => p.value), backgroundColor: ["#22c55e","#3b82f6","#eab308","#ef4444","#a855f7","#06b6d4","#f97316","#84cc16"] }]
+  },
+  options: { plugins: { legend: { labels: { color: "#cbd5e1" } } } }
+  });
+  }
+
+  // Price history expansion
+  const loadedHistories = {};
+
+  function toggleHistory(ticker, buyDate, buyPrice, triggerRow) {
+  const row = document.getElementById("history-row-" + ticker);
+  if (!row) return;
+  const arrow = triggerRow.querySelector("span");
+
+  if (!row.classList.contains("hidden")) {
+  row.classList.add("hidden");
+  if (arrow) arrow.textContent = "▶";
+  return;
+  }
+  row.classList.remove("hidden");
+  if (arrow) arrow.textContent = "▼";
+
+  if (loadedHistories[ticker]) return;
+  loadedHistories[ticker] = true;
+
+  // Figure out the right period based on buy date
+  const buyMs = new Date(buyDate).getTime();
+  const nowMs = Date.now();
+  const daysDiff = Math.floor((nowMs - buyMs) / 86400000);
+  let period = "1y";
+  if (daysDiff > 1500) period = "max";
+  else if (daysDiff > 365) period = "2y";
+  else if (daysDiff > 180) period = "1y";
+  else if (daysDiff > 90) period = "6mo";
+  else if (daysDiff > 30) period = "3mo";
+  else period = "1mo";
+
+  fetch("/api/history/" + encodeURIComponent(ticker) + "/?period=" + period + "&interval=1d")
+  .then(r => r.json())
+  .then(d => {
+  const bars = (d.bars || []).filter(b => b.time * 1000 >= buyMs);
+  if (!bars.length) {
+  document.getElementById("milestones-" + ticker).innerHTML = '<div class="text-muted">No price history available.</div>';
+  return;
+  }
+
+  // Build labels and data
+  const labels = bars.map(b => new Date(b.time * 1000));
+  const prices = bars.map(b => b.close);
+
+  // Line chart
+  const ctx = document.getElementById("chart-" + ticker);
+  new Chart(ctx, {
+  type: "line",
+  data: {
+  labels: labels,
+  datasets: [{
+  label: ticker + " Price",
+  data: prices,
+  borderColor: prices[prices.length - 1] >= buyPrice ? "#22c55e" : "#ef4444",
+  backgroundColor: "transparent",
+  borderWidth: 2,
+  pointRadius: 0,
+  tension: 0.3,
+  }, {
+  label: "Buy Price",
+  data: labels.map(() => buyPrice),
+  borderColor: "#94a3b8",
+  borderDash: [5, 5],
+  borderWidth: 1,
+  pointRadius: 0,
+  }]
+  },
+  options: {
+  responsive: true,
+  scales: {
+  x: {
+  type: "time",
+  time: { unit: daysDiff > 365 ? "month" : daysDiff > 60 ? "week" : "day" },
+  grid: { color: "#1e293b" },
+  ticks: { color: "#94a3b8", maxTicksLimit: 8 },
+  },
+  y: {
+  grid: { color: "#1e293b" },
+  ticks: { color: "#94a3b8", callback: v => "₹" + v.toFixed(0) },
+  }
+  },
+  plugins: {
+  legend: { labels: { color: "#cbd5e1", boxWidth: 12 } },
+  tooltip: {
+  callbacks: {
+  label: ctx => ctx.dataset.label + ": ₹" + ctx.parsed.y.toFixed(2)
+  }
+  }
+  }
+  }
+  });
+
+  // Milestones
+  const milestoneEl = document.getElementById("milestones-" + ticker);
+  const first = bars[0];
+  const last = bars[bars.length - 1];
+  const milestones = [
+  { label: "Buy price", date: buyDate, price: buyPrice },
+  { label: "First close (after buy)", date: fmtDate(first.time), price: first.close },
+  ];
+
+  // Find prices at key offsets from buy date
+  const offsets = [
+  { label: "After 1 week", days: 7 },
+  { label: "After 1 month", days: 30 },
+  { label: "After 3 months", days: 90 },
+  { label: "After 6 months", days: 180 },
+  { label: "After 1 year", days: 365 },
+  ];
+  offsets.forEach(o => {
+  const target = buyMs + o.days * 86400000;
+  if (target > nowMs) return;
+  const closest = bars.reduce((best, b) =>Math.abs(b.time * 1000 - target) < Math.abs(best.time * 1000 - target) ? b : best
+  );
+  milestones.push({ label: o.label, date: fmtDate(closest.time), price: closest.close });
+  });
+
+  milestones.push({ label: "Today", date: fmtDate(last.time), price: last.close });
+
+  // Render milestones
+  milestoneEl.innerHTML = '<h5 class="font-semibold text-white text-xs uppercase tracking-wider mb-2">Key Dates</h5>' +
+  milestones.map(m => {
+  const change = ((m.price - buyPrice) / buyPrice * 100).toFixed(1);
+  const isUp = m.price >= buyPrice;
+  return '<div class="flex items-center justify-between bg-panel rounded-lg px-3 py-2 border border-slate-700">' +
+  '<div><div class="text-white font-medium">' + m.label + '</div>' +
+  '<div class="text-[10px] text-muted">' + m.date + '</div></div>' +
+  '<div class="text-right"><div class="font-mono">₹' + Number(m.price).toFixed(2) + '</div>' +
+  '<div class="text-[10px] ' + (isUp ? 'text-accent' : 'text-danger') + '">' +
+  (isUp ? '+' : '') + change + '%</div></div></div>';
+  }).join("");
+  })
+  .catch(() => {
+  document.getElementById("milestones-" + ticker).innerHTML = '<div class="text-muted">Failed to load.</div>';
+  });
+  }
+
+  function fmtDate(unix) {
+  const d = new Date(unix * 1000);
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}What If · TradeLab{% endblock %}
+{% block content %}
+
+<div class="page-head fade-in">
+  <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">
+    What if I'd bought <span class="gradient-text">on that date</span>?
+  </h2>
+  <p>Pick a stock, a past date, and a rupee amount. We'll show exactly what would've happened — today's value, the CAGR, and the worst moment you'd have survived along the way.</p>
+</div>
+
+<form method="get" class="card p-5 md:p-6 mb-6">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div style="position:relative;">
+      <label class="eyebrow block mb-1.5">Ticker</label>
+      <input name="ticker" value="{{ ticker }}" placeholder="HDFCBANK"
+             data-autocomplete="ticker" autocomplete="off" spellcheck="false" required>
+    </div>
+    <div>
+      <label class="eyebrow block mb-1.5">Buy date</label>
+      <input type="date" name="date" value="{{ date }}" max="{% now 'Y-m-d' %}" required>
+    </div>
+    <div>
+      <label class="eyebrow block mb-1.5">Amount invested (₹)</label>
+      <input type="number" min="1" step="1" name="amount" value="{{ amount|default:'10000' }}" placeholder="10000" required>
+    </div>
+    <div style="display:flex;align-items:flex-end;">
+      <button type="submit" style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">
+        Run the tape ↩
+      </button>
+    </div>
+  </div>
+</form>
+
+{% if error %}
+<div class="card p-5 mb-6" style="border-color: rgba(251,113,133,0.4);">
+  <div class="eyebrow mb-1" style="color: var(--sa-danger);">Couldn't compute</div>
+  <div style="font-size:14px;">{{ error }}</div>
+</div>
+{% endif %}
+
+{% if result %}
+<!-- Hero result -->
+<div class="card card-hover spotlight p-6 md:p-8 mb-6 fade-in"
+     onmousemove="this.style.setProperty('--mx',event.offsetX+'px');this.style.setProperty('--my',event.offsetY+'px');">
+  <div class="eyebrow mb-2">If you'd invested ₹{{ result.amount|inr }} in {{ result.ticker }} on {{ result.start_date }}…</div>
+  <div style="display:flex;gap:28px;align-items:baseline;flex-wrap:wrap;">
+    <div>
+      <div class="text-xs" style="color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.12em;">Today it'd be worth</div>
+      <div class="gradient-text" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2.2rem,5vw,3.6rem);line-height:1;">
+        ₹{{ result.current_value|inr }}
+      </div>
+    </div>
+    <div>
+      <div class="text-xs" style="color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.12em;">Return</div>
+      <div class="num-big text-3xl {% if result.pnl >= 0 %}text-accent{% else %}text-danger{% endif %}">
+        {% if result.pnl >= 0 %}+{% endif %}{{ result.pnl_pct }}%
+      </div>
+      <div class="text-xs mt-1" style="color:var(--sa-muted);">
+        {% if result.pnl >= 0 %}+{% endif %}₹{{ result.pnl|inr }} over {{ result.years }} years
+      </div>
+    </div>
+    <div>
+      <div class="text-xs" style="color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.12em;">CAGR</div>
+      <div class="num-big text-3xl {% if result.cagr >= 0 %}text-accent{% else %}text-danger{% endif %}">
+        {% if result.cagr >= 0 %}+{% endif %}{{ result.cagr }}%
+      </div>
+      <div class="text-xs mt-1" style="color:var(--sa-muted);">compounded</div>
+    </div>
+    {% if result.bench_ret is not None %}
+    <div>
+      <div class="text-xs" style="color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.12em;">Nifty 50 did</div>
+      <div class="num-big text-3xl" style="color:var(--sa-muted);">
+        {% if result.bench_ret >= 0 %}+{% endif %}{{ result.bench_ret }}%
+      </div>
+      <div class="text-xs mt-1 {% if result.pnl_pct > result.bench_ret %}text-accent{% else %}text-danger{% endif %}">
+        {% if result.pnl_pct > result.bench_ret %}Beat the market{% else %}Underperformed{% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="card p-6 mb-6">
+  <div class="eyebrow mb-3">Your portfolio value over time</div>
+  <canvas id="wi-chart" style="width:100%;height:320px;"></canvas>
+</div>
+
+<!-- The journey would've been rough: max drawdown + extremes -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 stagger">
+  <div class="card card-hover p-5">
+    <div class="eyebrow mb-2" style="color: var(--sa-danger);">Worst moment along the way</div>
+    <div class="num-big text-2xl text-danger">{{ result.mdd_pct }}%</div>
+    <div class="text-xs mt-2" style="color:var(--sa-muted);line-height:1.5;">
+      On <strong>{{ result.mdd_date }}</strong> your investment was down {{ result.mdd_pct }}% from its previous peak. This is what "holding through volatility" actually means.
+    </div>
+  </div>
+  <div class="card card-hover p-5">
+    <div class="eyebrow mb-2" style="color: var(--sa-accent);">Best exit you could've taken</div>
+    <div class="num-big text-2xl text-accent">₹{{ result.best_price }}</div>
+    <div class="text-xs mt-2" style="color:var(--sa-muted);line-height:1.5;">
+      Peak close on <strong>{{ result.best_date }}</strong>. If you'd sold here, you'd have looked like a genius. (You wouldn't have.)
+    </div>
+  </div>
+  <div class="card card-hover p-5">
+    <div class="eyebrow mb-2">Worst buy you could've made</div>
+    <div class="num-big text-2xl" style="color:var(--sa-muted);">₹{{ result.worst_price }}</div>
+    <div class="text-xs mt-2" style="color:var(--sa-muted);line-height:1.5;">
+      The lowest close was on <strong>{{ result.worst_date }}</strong>. Even buying here, patient holders usually came out fine — time matters more than entry.
+    </div>
+  </div>
+</div>
+
+<div class="card p-5" style="border-color: rgba(96,165,250,0.3); background: linear-gradient(135deg, rgba(96,165,250,0.08), transparent);">
+  <div class="eyebrow mb-1" style="color: #60a5fa;">Lesson</div>
+  <p style="font-size:14px;line-height:1.6;color:var(--sa-ink);">
+    Hindsight looks clean — but you'd have lived every one of those down days wondering if you made a mistake. This is why position sizing and time horizon matter more than picking the "right" entry.
+  </p>
+</div>
+
+<script>
+(function () {
+  var series = {{ result.series|safe }};
+  var canvas = document.getElementById("wi-chart");
+  function draw() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth, h = 320;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    if (!series.length) return;
+    var vs = series.map(function(p){return p.v;});
+    var lo = Math.min.apply(null, vs), hi = Math.max.apply(null, vs);
+    var pad = (hi-lo)*0.1; lo -= pad; hi += pad;
+    var accent = getComputedStyle(document.documentElement).getPropertyValue('--sa-accent').trim() || '#34d399';
+    // Area
+    ctx.beginPath();
+    series.forEach(function(p,i){
+      var x = i/(series.length-1)*(w-40)+20;
+      var y = h-20 - ((p.v-lo)/(hi-lo))*(h-40);
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.stroke();
+    ctx.lineTo(w-20, h-20); ctx.lineTo(20, h-20); ctx.closePath();
+    var g = ctx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0, accent+'40'); g.addColorStop(1, accent+'00');
+    ctx.fillStyle = g; ctx.fill();
+    // Endpoints
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(w-20, h-20-((vs[vs.length-1]-lo)/(hi-lo))*(h-40), 4, 0, 6.283); ctx.fill();
+  }
+  draw();
+  window.addEventListener("resize", draw);
+})();
+</script>
+
+{% else %}
+<div class="card p-6" style="color:var(--sa-muted);font-size:14px;line-height:1.6;">
+  <div class="eyebrow mb-2">Try some classics</div>
+  <p>HDFC Bank from 2005. Reliance from 2000. TCS from its IPO. Or your own story — the last stock you wish you'd bought.</p>
+</div>
+{% endif %}
+
+{% endblock %}

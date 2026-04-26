@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}Learning Center · TradeLab{% endblock %}
+{% block content %}
+
+<style>
+  .ring-svg { transform: rotate(-90deg); }
+  .ring-fg {
+    stroke: var(--sa-accent);
+    stroke-dasharray: 283;
+    stroke-dashoffset: 283;
+    transition: stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1);
+  }
+  .lc-stat {
+    border: 1px solid var(--sa-border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    background: linear-gradient(180deg, var(--sa-card-bg) 0%, var(--sa-card-bg2) 100%);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  .lc-stat .v { font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 700; font-size: 28px; }
+  .lc-stat .l { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--sa-muted); margin-top: 2px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 999px;
+    border: 1px solid var(--sa-border);
+    color: var(--sa-muted); background: transparent;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all .15s;
+  }
+  .chip:hover { color: var(--sa-ink); border-color: var(--sa-border2); }
+  .chip.on   { color: var(--sa-accent); border-color: var(--sa-accent); background: rgba(52,211,153,0.10); }
+  .mod-card {
+    position: relative;
+    border: 1px solid var(--sa-border);
+    border-radius: 16px;
+    padding: 20px;
+    background: linear-gradient(180deg, var(--sa-card-bg) 0%, var(--sa-card-bg2) 100%);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 160px;
+    overflow: hidden;
+  }
+  .mod-card::before {
+    content: ''; position: absolute; inset: -1px;
+    border-radius: inherit; pointer-events: none;
+    background: linear-gradient(135deg, transparent 50%, rgba(52,211,153,0.12));
+    opacity: 0; transition: opacity .25s;
+  }
+  .mod-card:hover { transform: translateY(-2px); border-color: var(--sa-border2); }
+  .mod-card:hover::before { opacity: 1; }
+  .mod-card.done { border-color: rgba(52,211,153,0.35); }
+  .mod-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 44px; font-weight: 700;
+    color: rgba(255,255,255,0.05);
+    position: absolute; top: 6px; right: 14px;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  html.light .mod-num { color: rgba(15,23,42,0.06); }
+  .mod-title { font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 700; font-size: 17px; color: var(--sa-ink); }
+  .mod-summary { font-size: 13px; color: var(--sa-muted); line-height: 1.5; flex: 1; }
+  .mod-meta { display: flex; gap: 10px; align-items: center; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sa-muted); }
+  .cat-dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
+  .cat-basics  { background: #34d399; }
+  .cat-tech    { background: #60a5fa; }
+  .cat-fund    { background: #fbbf24; }
+  .cat-risk    { background: #fb7185; }
+  .cat-options { background: #c4b5fd; }
+  .done-badge {
+    position: absolute; top: 14px; right: 14px;
+    width: 24px; height: 24px; border-radius: 999px;
+    background: rgba(52,211,153,0.15);
+    color: var(--sa-accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    z-index: 2;
+  }
+  .tip-card {
+    background: linear-gradient(135deg, rgba(52,211,153,0.08), rgba(251,191,36,0.05));
+    border: 1px solid rgba(52,211,153,0.25);
+    border-radius: 14px; padding: 18px 22px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .tip-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(52,211,153,0.15); color: var(--sa-accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex: none;
+  }
+  .continue-card {
+    background: linear-gradient(135deg, rgba(52,211,153,0.12), rgba(96,165,250,0.06));
+    border: 1px solid rgba(52,211,153,0.3);
+    border-radius: 16px; padding: 22px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap;
+    transition: transform .2s, border-color .2s;
+  }
+  .continue-card:hover { transform: translateY(-2px); border-color: var(--sa-accent); }
+  @keyframes count-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: count-in .5s cubic-bezier(.2,.8,.2,1) backwards; }
+</style>
+
+<div class="page-head">
+  <h2 class="transition-colors duration-300 {{ heading_hover_class }} cursor-default inline-block">Learning Center</h2>
+  <p>Ten modules built for Indian retail investors. Read, then take a 3-question quiz — your progress tracks automatically.</p>
+</div>
+
+<!-- Hero: progress ring + stats -->
+<div class="card card-hover mb-6 p-6 md:p-8" style="display: flex; gap: 28px; align-items: center; flex-wrap: wrap;">
+  <div style="position: relative; width: 120px; height: 120px; flex: none;">
+    <svg class="ring-svg" width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="45" stroke="var(--sa-border2)" stroke-width="8" fill="none" />
+      <circle class="ring-fg" id="progress-ring" cx="60" cy="60" r="45" stroke-width="8" fill="none" stroke-linecap="round" />
+    </svg>
+    <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px;">{{ overall_pct }}%</div>
+      <div class="eyebrow" style="font-size: 9px;">Complete</div>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 240px;">
+    <div class="eyebrow mb-2">Your journey</div>
+    <h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.2;" id="hero-greeting">Keep going — you're building a real edge.</h3>
+    <p class="text-muted text-sm mt-2" style="max-width: 55ch;" id="hero-sub">Every module closes with a quiz. Scoring 3/3 marks it done, and the circle fills up.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 12px;">
+    <div class="lc-stat"><div class="v" id="stat-done">0</div><div class="l">Completed</div></div>
+    <div class="lc-stat"><div class="v" id="stat-total">0</div><div class="l">Modules</div></div>
+    <div class="lc-stat"><div class="v" id="stat-terms">0</div><div class="l">Key Terms</div></div>
+    <div class="lc-stat"><div class="v" id="stat-quiz">0</div><div class="l">Quiz Correct</div></div>
+  </div>
+</div>
+
+<!-- Continue + Encyclopedia side by side -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  {% if next_module %}
+  <a href="{% url 'learning_module' next_module.slug %}" class="continue-card md:col-span-2" style="text-decoration: none; color: inherit;">
+    <div>
+      <div class="eyebrow mb-1">Continue where you left off</div>
+      <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;">{{ next_module.title }}</div>
+      <div class="text-muted text-sm mt-1">{{ next_module.summary }}</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; color: var(--sa-accent); font-weight: 600;">
+      Open module <span style="font-size: 18px;">→</span>
+    </div>
+  </a>
+  {% endif %}
+
+  <a href="{% url 'encyclopedia' %}" class="card card-hover p-5" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <div>
+      <div class="eyebrow mb-1">Reference</div>
+      <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px;">Trading Encyclopedia</div>
+      <div class="text-muted text-sm mt-1">113 indicators, strategies and glossary terms — one searchable reference.</div>
+    </div>
+    <div style="color: var(--sa-accent); font-weight: 600; margin-top: 10px;">Open →</div>
+  </a>
+</div>
+
+<!-- Badges -->
+<div class="card p-5 md:p-6 mb-6">
+  <div class="flex items-baseline justify-between mb-4 flex-wrap gap-2">
+    <div>
+      <div class="eyebrow mb-1">Badges</div>
+      <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;">{{ earned_count }}/{{ badges|length }} earned</h3>
+    </div>
+    <div class="text-xs" style="color:var(--sa-muted);">Hover a badge to see how to earn it</div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    {% for b in badges %}
+      <div title="{{ b.hint }}" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1px solid var(--sa-border);
+           {% if b.earned %}background:linear-gradient(135deg,rgba(52,211,153,0.14),rgba(251,191,36,0.08));border-color:var(--sa-accent);color:var(--sa-ink);
+           {% else %}background:transparent;color:var(--sa-muted);opacity:0.55;
+           {% endif %}
+           font-size:13px;font-weight:600;">
+        <span style="font-size:16px;{% if not b.earned %}filter:grayscale(1);{% endif %}">{{ b.icon }}</span>
+        <span>{{ b.label }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Tip of the day -->
+<div class="tip-card mb-6">
+  <div class="tip-icon">💡</div>
+  <div style="flex: 1;">
+    <div class="eyebrow mb-1">Tip of the day</div>
+    <div id="tip-text" style="font-size: 14px; color: var(--sa-ink); line-height: 1.55;"></div>
+  </div>
+</div>
+
+<!-- Category filters -->
+<div class="flex flex-wrap gap-2 mb-5" id="filters">
+  <button class="chip on" data-cat="all">All <span style="opacity:.6">· {{ items|length }}</span></button>
+  <button class="chip" data-cat="basics"><span class="cat-dot cat-basics"></span>Basics</button>
+  <button class="chip" data-cat="tech"><span class="cat-dot cat-tech"></span>Technicals</button>
+  <button class="chip" data-cat="fund"><span class="cat-dot cat-fund"></span>Fundamentals</button>
+  <button class="chip" data-cat="risk"><span class="cat-dot cat-risk"></span>Risk &amp; Sizing</button>
+  <button class="chip" data-cat="options"><span class="cat-dot cat-options"></span>Options &amp; Advanced</button>
+</div>
+
+<!-- Module grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="mod-grid">
+  {% for it in items %}
+    {% with order=it.module.order %}
+    <a href="{% url 'learning_module' it.module.slug %}"
+       class="mod-card fade-in {% if it.completed %}done{% endif %}"
+       style="text-decoration: none; color: inherit; animation-delay: {{ forloop.counter0|add:"1" }}00ms;"
+       data-cat="{% if order <= 2 %}basics{% elif order <= 5 %}tech{% elif order <= 7 %}fund{% elif order <= 9 %}risk{% else %}options{% endif %}">
+      <span class="mod-num">{{ order|stringformat:"02d" }}</span>
+      {% if it.completed %}<span class="done-badge" title="Quiz {{ it.score }}/3">✓</span>{% endif %}
+      <div class="mod-meta">
+        <span class="cat-dot {% if order <= 2 %}cat-basics{% elif order <= 5 %}cat-tech{% elif order <= 7 %}cat-fund{% elif order <= 9 %}cat-risk{% else %}cat-options{% endif %}"></span>
+        <span>{% if order <= 2 %}Basics{% elif order <= 5 %}Technicals{% elif order <= 7 %}Fundamentals{% elif order <= 9 %}Risk{% else %}Advanced{% endif %}</span>
+        <span>·</span>
+        <span>~{{ it.read_min }} min read</span>
+      </div>
+      <div class="mod-title">{{ it.module.title }}</div>
+      <div class="mod-summary">{{ it.module.summary }}</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+        <span style="font-size: 12px; color: var(--sa-muted);">
+          {% if it.completed %}<span style="color: var(--sa-accent); font-weight: 600;">Completed · {{ it.score }}/3</span>
+          {% else %}Start module →{% endif %}
+        </span>
+      </div>
+    </a>
+    {% endwith %}
+  {% empty %}
+    <p class="text-muted col-span-full">No modules loaded. Run <code>python manage.py loaddata learning_modules.json</code>.</p>
+  {% endfor %}
+</div>
+
+<script>
+(function () {
+  // ── Animate progress ring + counters ──
+  var pct = {{ overall_pct|default:0 }};
+  var ring = document.getElementById('progress-ring');
+  if (ring) setTimeout(function () { ring.style.strokeDashoffset = (283 - (283 * pct / 100)).toFixed(1); }, 100);
+
+  var doneN  = {{ done_n|default:0 }};
+  var totalN = {{ items|length }};
+  var terms  = {{ total_terms|default:0 }};
+  var quizN  = {{ total_quiz|default:0 }};
+
+  function countTo(el, target, dur) {
+    if (!el) return;
+    var start = performance.now();
+    function step(t) {
+      var p = Math.min(1, (t - start) / dur);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  countTo(document.getElementById('stat-done'),  doneN,  900);
+  countTo(document.getElementById('stat-total'), totalN, 900);
+  countTo(document.getElementById('stat-terms'), terms,  1100);
+  countTo(document.getElementById('stat-quiz'),  quizN,  1100);
+
+  // Dynamic greeting
+  var h = new Date().getHours();
+  var greet = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  var heroEl = document.getElementById('hero-greeting');
+  if (pct === 0) {
+    heroEl.textContent = greet + " — your learning journey starts here.";
+    document.getElementById('hero-sub').textContent = "Pick any module below. Each one takes 5–10 minutes.";
+  } else if (pct === 100) {
+    heroEl.textContent = "🎉 You've completed every module!";
+    document.getElementById('hero-sub').textContent = "Brush up anytime — or dive into the Encyclopedia for deeper references.";
+  } else if (pct >= 50) {
+    heroEl.textContent = greet + ", you're over halfway there.";
+    document.getElementById('hero-sub').textContent = "Momentum matters — finish one more today.";
+  } else {
+    heroEl.textContent = greet + " — keep going.";
+    document.getElementById('hero-sub').textContent = "You're building a real edge. One module, one quiz at a time.";
+  }
+
+  // ── Tip of the day ──
+  var tips = [
+    "A green candle isn't a buy signal. Volume, context and the bar before it matter more.",
+    "PE ratio without growth context is meaningless — compare to sector peers, not across sectors.",
+    "In Indian markets, promoter holding below 25% is a structural warning sign.",
+    "ATR-based stops respect volatility; fixed-percent stops ignore it.",
+    "Position size > entry price. Most retail blow-ups come from sizing, not timing.",
+    "Weekly chart > daily chart for direction. Daily chart > weekly for entries.",
+    "If you can't explain a trade in one sentence, the setup isn't clean enough.",
+    "Backtests lie when survivorship bias isn't filtered — prefer same-index historical universes.",
+    "Moving averages are lagging. They confirm, they don't predict.",
+    "A breakout on low volume is usually a trap. Volume confirms conviction.",
+    "RSI above 70 isn't 'sell' in strong trends — it's 'strong trend'. Context first.",
+    "Diversification stops working after ~15 stocks in Indian equities. Add bonds or gold instead.",
+    "Dividends reinvested beat dividends collected — by a wide margin, over 20+ years.",
+    "MACD crossovers work best in trending regimes, poorly in choppy ones. Detect the regime first."
+  ];
+  var day = Math.floor(Date.now() / 86400000);
+  document.getElementById('tip-text').textContent = tips[day % tips.length];
+
+  // ── Category filter ──
+  var chips = document.querySelectorAll('#filters .chip');
+  var cards = document.querySelectorAll('#mod-grid .mod-card');
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      chips.forEach(function (x) { x.classList.remove('on'); });
+      c.classList.add('on');
+      var cat = c.dataset.cat;
+      cards.forEach(function (card) {
+        card.style.display = (cat === 'all' || card.dataset.cat === cat) ? '' : 'none';
+      });
+    });
+  });
+})();
+</script>
+
+{% endblock %}

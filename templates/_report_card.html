@@ -1,0 +1,466 @@
+{# Reusable analysis report card #}
+
+{% if report.buy_rating %}
+{% with br=report.buy_rating %}
+<div class="bg-panel rounded-2xl p-6 border border-white/5 mb-6">
+  <div class="flex items-start justify-between mb-5 flex-wrap gap-4">
+    <!-- Left: score + tier -->
+    <div class="flex items-center gap-5">
+      <div class="relative w-20 h-20 flex items-center justify-center">
+        <!-- Score ring -->
+        <svg class="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#1e293b" stroke-width="5"/>
+          <circle cx="40" cy="40" r="35" fill="none"
+            stroke="{% if br.tier_color == 'accent' %}#10b981{% elif br.tier_color == 'danger' %}#f43f5e{% else %}#f59e0b{% endif %}"
+            stroke-width="5" stroke-linecap="round"
+            stroke-dasharray="{{ br.score|floatformat:0 }}0 220"
+            style="transition: stroke-dasharray 0.8s ease;"/>
+        </svg>
+        <span class="absolute font-mono font-bold text-2xl text-white">{{ br.score }}</span>
+      </div>
+      <div>
+        <div class="font-display font-bold text-xl
+          {% if br.tier_color == 'accent' %}text-emerald-400
+          {% elif br.tier_color == 'danger' %}text-rose-400
+          {% else %}text-amber-400{% endif %}">{{ br.tier }}</div>
+        <p class="text-xs text-slate-400 mt-1 max-w-xs">{{ br.tier_description }}</p>
+      </div>
+    </div>
+
+    <!-- Right: see details button -->
+    <button onclick="document.getElementById('rating-modal').classList.remove('hidden')"
+      class="text-xs bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 px-4 py-2 rounded-lg transition font-semibold">
+      See full breakdown
+    </button>
+  </div>
+
+  <!-- Category bars — 5 mini progress bars, one per scoring category -->
+  <div class="grid grid-cols-5 gap-3">
+    {% for cat_name, cat in br.sub_scores.items %}
+      <div>
+        <div class="flex items-baseline justify-between mb-1">
+          <span class="text-[10px] text-slate-400 font-semibold">{{ cat_name }}</span>
+          <span class="text-[10px] font-mono text-slate-500">{{ cat.earned }}/{{ cat.max }}</span>
+        </div>
+        <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+          {% widthratio cat.earned cat.max 100 as bar_pct %}
+          <div class="h-1.5 rounded-full transition-all duration-500
+            {% if bar_pct >= 70 %}bg-emerald-400
+            {% elif bar_pct >= 40 %}bg-amber-400
+            {% else %}bg-rose-400{% endif %}"
+            style="width: {{ bar_pct }}%;"></div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Rating detail popup/modal -->
+<div id="rating-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="bg-panel border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl mx-4">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h3 class="font-display font-bold text-xl">Score Breakdown — {{ br.score }}/10</h3>
+        <p class="text-xs text-slate-400 mt-1">How we rated {{ report.ticker }}. 10 points across 5 categories.</p>
+      </div>
+      <button onclick="document.getElementById('rating-modal').classList.add('hidden')"
+        class="text-slate-400 hover:text-white text-2xl leading-none px-2">&times;</button>
+    </div>
+
+    <!-- Scale reference -->
+    <div class="grid grid-cols-5 gap-1 mb-5 text-[10px] font-mono text-center">
+      <div class="rounded-lg py-1.5 {% if br.score < 3.5 %}ring-1 ring-rose-400{% endif %} bg-rose-500/10 text-rose-400">0–3.4<br>Strong Avoid</div>
+      <div class="rounded-lg py-1.5 {% if br.score >= 3.5 and br.score < 5 %}ring-1 ring-amber-400{% endif %} bg-amber-500/10 text-amber-400">3.5–4.9<br>Avoid</div>
+      <div class="rounded-lg py-1.5 {% if br.score >= 5 and br.score < 6.5 %}ring-1 ring-amber-400{% endif %} bg-amber-500/10 text-amber-400">5–6.4<br>Hold</div>
+      <div class="rounded-lg py-1.5 {% if br.score >= 6.5 and br.score < 8 %}ring-1 ring-emerald-400{% endif %} bg-emerald-500/10 text-emerald-400">6.5–7.9<br>Buy</div>
+      <div class="rounded-lg py-1.5 {% if br.score >= 8 %}ring-1 ring-emerald-400{% endif %} bg-emerald-500/10 text-emerald-400">8–10<br>Strong Buy</div>
+    </div>
+
+    <!-- Factors grouped by category -->
+    {% regroup br.factors by cat as grouped %}
+    {% for group in grouped %}
+      <div class="mb-4">
+        <div class="flex items-baseline justify-between mb-2">
+          <span class="text-xs font-semibold text-white uppercase tracking-wider">{{ group.grouper }}</span>
+          {% for cat_name, cat in br.sub_scores.items %}
+            {% if cat_name == group.grouper %}
+              <span class="text-[11px] font-mono text-slate-500">{{ cat.earned }} / {{ cat.max }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div class="space-y-1.5">
+          {% for f in group.list %}
+            <div class="flex items-start gap-3 bg-panel2 rounded-lg px-4 py-2.5 border border-white/5">
+              <span class="mt-0.5 w-2 h-2 rounded-full flex-shrink-0
+                {% if f.positive == True %}bg-emerald-400
+                {% elif f.positive == False %}bg-rose-400
+                {% else %}bg-slate-500{% endif %}"></span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-white font-medium">{{ f.label }}</span>
+                  <span class="font-mono text-[11px] ml-2
+                    {% if f.positive == True %}text-emerald-400
+                    {% elif f.positive == False %}text-rose-400
+                    {% else %}text-slate-500{% endif %}">{{ f.pts }}</span>
+                </div>
+                {% if f.why %}
+                  <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{{ f.why }}</p>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endwith %}
+{% endif %}
+
+<div class="bg-panel rounded-xl p-6 border border-slate-800">
+  <div class="flex items-start justify-between mb-4 flex-wrap gap-3">
+  <div>
+  <h3 class="text-xl font-bold">{{ report.name }}</h3>
+  <p class="text-muted text-sm">{{ report.ticker }} · {{ report.fundamentals.sector|default:"—" }}</p>
+  </div>
+  <div class="text-right">
+  <div class="text-3xl font-bold">₹{{ report.quote.price }}</div>
+  <div class="{% if report.quote.change_pct >= 0 %}text-accent{% else %}text-danger{% endif %} text-sm">
+  {{ report.quote.change }} ({{ report.quote.change_pct }}%)
+  </div>
+  <div class="flex gap-2 mt-2 justify-end">
+  <button onclick="document.getElementById('portfolio-modal').classList.remove('hidden')"
+  class="text-xs bg-accent hover:bg-emerald-400 text-base font-semibold px-3 py-1.5 rounded-lg transition">
+  + Portfolio
+  </button>
+  <form method="post" action="{% url 'watchlist_add' %}">
+  {% csrf_token %}
+  <input type="hidden" name="ticker" value="{{ report.ticker }}" />
+  <button type="submit"
+  class="text-xs bg-panel2 hover:bg-slate-600 border border-slate-700 text-white font-semibold px-3 py-1.5 rounded-lg transition">
+  + Watchlist
+  </button>
+  </form>
+  </div>
+  </div>
+  </div>
+
+  <!-- Add to portfolio modal -->
+  <div id="portfolio-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="bg-panel border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+  <h4 class="text-lg font-bold mb-4">Add {{ report.ticker }} to Portfolio</h4>
+  <form method="post" action="{% url 'portfolio_add' %}">
+  {% csrf_token %}
+  <input type="hidden" name="ticker" value="{{ report.ticker }}" />
+  <div class="space-y-3">
+  <div>
+  <label class="text-xs text-muted block mb-1">Buy price (₹)</label>
+  <input name="buy_price" type="number" step="0.01" value="{{ report.quote.price }}"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-accent" />
+  </div>
+  <div>
+  <label class="text-xs text-muted block mb-1">Quantity (shares)</label>
+  <input name="quantity" type="number" min="1" value="1"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-accent" />
+  </div>
+  <div>
+  <label class="text-xs text-muted block mb-1">Date bought</label>
+  <input name="date_bought" type="date" value="{% now 'Y-m-d' %}"
+  class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-accent" />
+  </div>
+  </div>
+  <div class="flex gap-3 mt-5">
+  <button type="submit"
+  class="flex-1 bg-accent hover:bg-emerald-400 text-base font-semibold py-2 rounded-lg transition">Add to Portfolio
+  </button>
+  <button type="button" onclick="document.getElementById('portfolio-modal').classList.add('hidden')"
+  class="flex-1 bg-panel2 hover:bg-slate-600 border border-slate-700 text-white font-semibold py-2 rounded-lg transition">Cancel
+  </button>
+  </div>
+  </form>
+  </div>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-sm">
+  <div><div class="text-muted text-xs">52W High</div><div>₹{{ report.quote.fifty_two_week_high|inr:2 }}</div></div>
+  <div><div class="text-muted text-xs">52W Low</div><div>₹{{ report.quote.fifty_two_week_low|inr:2 }}</div></div>
+  <div><div class="text-muted text-xs">PE Ratio</div><div>{{ report.fundamentals.pe_ratio|default:"—"|floatformat:2 }}</div></div>
+  <div><div class="text-muted text-xs">Volume</div><div>{{ report.quote.volume }}</div></div>
+  <div><div class="text-muted text-xs">SMA 20</div><div>₹{{ report.indicators.sma20|inr:2 }}</div></div>
+  <div><div class="text-muted text-xs">SMA 50</div><div>₹{{ report.indicators.sma50|inr:2 }}</div></div>
+  <div><div class="text-muted text-xs">RSI (14)</div><div>{{ report.indicators.rsi|floatformat:1 }}</div></div>
+  <div><div class="text-muted text-xs">MACD</div><div>{{ report.indicators.macd|floatformat:2 }}</div></div>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">Trend</div>
+  <div class="font-bold">{{ report.trend }}</div>
+  </div>
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">Momentum</div>
+  <div class="font-bold">{{ report.momentum }}</div>
+  </div>
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">Risk</div>
+  <div class="font-bold">{{ report.risk }}</div>
+  </div>
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">Action</div>
+  <div class="font-bold
+  {% if report.action == 'Buy' %}text-accent
+  {% elif report.action == 'Avoid' %}text-danger
+  {% else %}text-yellow-300{% endif %}">{{ report.action }}</div>
+  </div>
+  </div>
+
+  <div class="mb-4">
+  <div class="flex items-center justify-between text-xs text-muted mb-1">
+  <span>Signal: <strong class="text-white">{{ report.indicators.verdict }}</strong></span>
+  <span>Confidence {{ report.confidence }}%</span>
+  </div>
+  <div class="w-full bg-slate-800 rounded-full h-2">
+  <div class="bg-accent h-2 rounded-full" style="width: {{ report.confidence }}%"></div>
+  </div>
+  </div>
+
+  <h4 class="font-semibold mb-2">Why this verdict</h4>
+  <ul class="text-sm text-slate-300 space-y-1 list-disc pl-5">
+  {% for r in report.reasons %}<li>{{ r }}</li>{% endfor %}
+  </ul>
+</div>
+
+{% if report.financials %}
+{% with fin=report.financials %}
+<div class="bg-panel rounded-xl p-6 border border-slate-800 mt-6">
+  <h3 class="text-lg font-bold mb-4">Business Fundamentals</h3>
+
+  <!-- Summary tiles in the Robinhood/Google-finance style from the screenshot -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+  <div class="bg-panel2 rounded-xl p-5 border border-slate-700">
+  <div class="flex items-start justify-between mb-1">
+  <div>
+  <div class="text-sm font-semibold text-white">Quarterly financials</div>
+  <div class="text-xs text-muted">{{ fin.latest.quarter }}</div>
+  </div>
+  </div>
+  <div class="mt-4">
+  <div class="text-3xl font-bold">{{ fin.latest.revenue_str }}</div>
+  <div class="text-xs mt-1">
+  {% if fin.yoy_revenue_pct is not None %}
+  <span class="{% if fin.yoy_revenue_pct >= 0 %}text-accent{% else %}text-danger{% endif %}">
+  {% if fin.yoy_revenue_pct >= 0 %}+{% endif %}{{ fin.yoy_revenue_pct }}%
+  </span>
+  <span class="text-muted">Y/Y Revenue</span>
+  {% else %}
+  <span class="text-muted">Revenue</span>
+  {% endif %}
+  </div>
+  </div>
+  </div>
+
+  <div class="bg-panel2 rounded-xl p-5 border border-slate-700">
+  <div class="flex items-start justify-between mb-1">
+  <div>
+  <div class="text-sm font-semibold text-white">Profitability</div>
+  <div class="text-xs text-muted">{{ fin.latest.quarter }}</div>
+  </div>
+  </div>
+  <div class="mt-4 flex gap-6">
+  <div>
+  <div class="text-2xl font-bold {% if fin.yoy_profit_pct and fin.yoy_profit_pct >= 0 %}text-accent{% elif fin.yoy_profit_pct %}text-danger{% else %}text-white{% endif %}">
+  {% if fin.yoy_profit_pct is not None %}{% if fin.yoy_profit_pct >= 0 %}+{% endif %}{{ fin.yoy_profit_pct }}%{% else %}—{% endif %}
+  </div>
+  <div class="text-xs text-muted mt-1">Y/Y Net Profit</div>
+  </div>
+  <div>
+  <div class="text-2xl font-bold">
+  {% if fin.latest.margin is not None %}{{ fin.latest.margin }}%{% else %}—{% endif %}
+  </div>
+  <div class="text-xs text-muted mt-1">Net Margin</div>
+  </div>
+  </div>
+  </div>
+  </div>
+
+  <!-- Strengths & concerns: "why this stock is good" -->
+  {% if fin.strengths or fin.concerns %}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  {% if fin.strengths %}
+  <div>
+  <h4 class="font-semibold text-accent text-sm uppercase tracking-wider mb-2">What looks strong</h4>
+  <ul class="text-sm text-slate-300 space-y-2">
+  {% for s in fin.strengths %}<li class="flex gap-2"><span class="text-accent flex-shrink-0">•</span><span>{{ s }}</span></li>{% endfor %}
+  </ul>
+  </div>
+  {% endif %}
+  {% if fin.concerns %}
+  <div>
+  <h4 class="font-semibold text-danger text-sm uppercase tracking-wider mb-2">What to watch</h4>
+  <ul class="text-sm text-slate-300 space-y-2">
+  {% for c in fin.concerns %}<li class="flex gap-2"><span class="text-danger flex-shrink-0">•</span><span>{{ c }}</span></li>{% endfor %}
+  </ul>
+  </div>
+  {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Key fundamental ratios row -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">Trailing PE</div>
+  <div class="font-bold">{% if fin.snapshot.trailing_pe %}{{ fin.snapshot.trailing_pe|floatformat:1 }}x{% else %}—{% endif %}</div>
+  </div>
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">ROE</div>
+  <div class="font-bold">{% if fin.snapshot.roe %}{% widthratio fin.snapshot.roe 1 100 %}%{% else %}—{% endif %}</div>
+  </div>
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">D/E</div>
+  <div class="font-bold">{% if fin.snapshot.debt_to_equity %}{{ fin.snapshot.debt_to_equity|floatformat:2 }}{% else %}—{% endif %}</div>
+  </div>
+  <div class="bg-panel2 rounded p-3">
+  <div class="text-xs text-muted">Div Yield</div>
+  <div class="font-bold">{% if fin.snapshot.dividend_yield %}{{ fin.snapshot.dividend_yield|floatformat:2 }}%{% else %}—{% endif %}</div>
+  </div>
+  </div>
+
+  <!-- Quarterly history table -->
+  <h4 class="font-semibold mb-2">Quarterly history (last {{ fin.history|length }} quarters)</h4>
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+  <thead>
+  <tr class="text-xs text-muted uppercase tracking-wider border-b border-slate-700">
+  <th class="text-left py-2 pr-4">Quarter</th>
+  <th class="text-right py-2 px-4">Revenue</th>
+  <th class="text-right py-2 px-4">Net Profit</th>
+  <th class="text-right py-2 px-4">EPS</th>
+  <th class="text-right py-2 pl-4">Margin</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for h in fin.history %}
+  <tr class="border-b border-slate-800/60">
+  <td class="py-2 pr-4 font-mono text-xs">{{ h.quarter }}</td>
+  <td class="py-2 px-4 text-right font-mono">{{ h.revenue_str }}</td>
+  <td class="py-2 px-4 text-right font-mono">{{ h.net_income_str }}</td>
+  <td class="py-2 px-4 text-right font-mono">{% if h.eps is not None %}{{ h.eps }}{% else %}—{% endif %}</td>
+  <td class="py-2 pl-4 text-right font-mono">{% if h.margin is not None %}{{ h.margin }}%{% else %}—{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+
+  {% if fin.snapshot.financial_currency != "INR" %}
+  <p class="text-[11px] text-muted mt-3 italic">Source reports in {{ fin.snapshot.financial_currency }}; amounts auto-converted to INR for display.
+  </p>
+  {% endif %}
+</div>
+{% endwith %}
+{% endif %}
+
+{% if report.profile %}
+{% with p=report.profile %}
+<div class="bg-panel rounded-xl p-6 border border-slate-800 mt-6">
+  <h3 class="text-lg font-bold mb-4">About {{ p.name }}</h3>
+
+  <!-- Company story -->
+  <div class="mb-6">
+  <p class="text-sm text-slate-300 leading-relaxed">{{ p.summary }}</p>
+  <div class="flex flex-wrap gap-3 mt-3 text-xs">
+  {% if p.sector %}
+  <span class="bg-panel2 px-3 py-1 rounded-full border border-slate-700">{{ p.sector }}</span>
+  {% endif %}
+  {% if p.industry %}
+  <span class="bg-panel2 px-3 py-1 rounded-full border border-slate-700">{{ p.industry }}</span>
+  {% endif %}
+  {% if p.employees %}
+  <span class="bg-panel2 px-3 py-1 rounded-full border border-slate-700">{{ p.employees|floatformat:0 }} employees</span>
+  {% endif %}
+  {% if p.city %}
+  <span class="bg-panel2 px-3 py-1 rounded-full border border-slate-700">{{ p.city }}, {{ p.country }}</span>
+  {% endif %}
+  {% if p.website %}
+  <a href="{{ p.website }}" target="_blank" rel="noopener" class="bg-panel2 px-3 py-1 rounded-full border border-slate-700 hover:border-accent hover:text-accent transition">Website</a>
+  {% endif %}
+  </div>
+  </div>
+
+  <!-- Upcoming events -->
+  {% if p.next_earnings or p.ex_dividend_date %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+  {% if p.next_earnings %}
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-xs text-muted uppercase tracking-wider mb-1">Next Earnings</div>
+  <div class="text-lg font-bold">{{ p.next_earnings }}</div>
+  <div class="text-xs text-muted mt-1">Expect volatility around this date. Avoid large new positions right before earnings unless you have conviction.</div>
+  </div>
+  {% endif %}
+  {% if p.ex_dividend_date %}
+  <div class="bg-panel2 rounded-lg p-4 border border-slate-700">
+  <div class="text-xs text-muted uppercase tracking-wider mb-1">Ex-Dividend Date</div>
+  <div class="text-lg font-bold">{{ p.ex_dividend_date }}</div>
+  <div class="text-xs text-muted mt-1">Buy before this date to receive the upcoming dividend. The stock typically drops by the dividend amount on this day.</div>
+  </div>
+  {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Stock history: splits + dividends -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  {% if p.splits %}
+  <div>
+  <h4 class="text-sm font-semibold mb-2">Stock Splits</h4>
+  <div class="space-y-2">
+  {% for s in p.splits %}
+  <div class="flex items-center justify-between bg-panel2 rounded-lg px-3 py-2 border border-slate-700 text-sm">
+  <span class="text-muted">{{ s.date }}</span>
+  <span class="font-mono text-white font-semibold">{{ s.ratio }} split</span>
+  </div>
+  {% endfor %}
+  </div>
+  <p class="text-[11px] text-muted mt-2 leading-relaxed">A stock split divides each share into more shares at a lower price — your total value stays the same.
+  Companies split when the per-share price gets too high for retail investors. More splits = a stock that
+  has gone up enough to need them.
+  </p>
+  </div>
+  {% endif %}
+
+  {% if p.dividends %}
+  <div>
+  <h4 class="text-sm font-semibold mb-2">Dividend History (last {{ p.dividends|length }})</h4>
+  <div class="space-y-1">
+  {% for d in p.dividends %}
+  <div class="flex items-center justify-between bg-panel2 rounded-lg px-3 py-2 border border-slate-700 text-sm">
+  <span class="text-muted">{{ d.date }}</span>
+  <span class="font-mono text-accent">₹{{ d.amount }}</span>
+  </div>
+  {% endfor %}
+  </div>
+  <p class="text-[11px] text-muted mt-2 leading-relaxed">Dividends are cash payments from the company's profits directly to your bank account.
+  Rising dividends over time signal that the company is consistently profitable and
+  confident in its future — one of the strongest long-term quality markers.
+  </p>
+  </div>
+  {% endif %}
+  </div>
+
+  <!-- Learn more: sector-relevant modules -->
+  {% if p.learn_modules %}
+  <div>
+  <h4 class="text-sm font-semibold mb-2">Learn more about {{ p.sector|default:"investing" }}</h4>
+  <p class="text-xs text-muted mb-3">These modules from the Learning Center are most relevant for understanding this stock:</p>
+  <div class="flex flex-wrap gap-2">
+  {% for mod in p.learn_modules %}
+  <a href="{% url 'learning_module' mod.slug %}"
+  class="bg-panel2 hover:bg-slate-700 border border-slate-700 hover:border-accent rounded-lg px-3 py-2 text-sm transition">
+  {{ mod.title }}
+  </a>
+  {% endfor %}
+  </div>
+  </div>
+  {% endif %}
+</div>
+{% endwith %}
+{% endif %}
