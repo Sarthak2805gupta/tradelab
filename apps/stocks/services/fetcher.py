@@ -28,8 +28,8 @@ try:
 except Exception:  # pragma: no cover
     yf = None
 
-CACHE_TTL_SECONDS = 180   # "fresh" window — serve without revalidation
-CACHE_STALE_SECONDS = 1800  # "stale-while-revalidate" window — serve stale, refresh in background
+CACHE_TTL_SECONDS = 600    # "fresh" window — 10 min, serve without revalidation
+CACHE_STALE_SECONDS = 3600 # "stale-while-revalidate" window — 1 hr, serve stale, refresh in background
 
 INDEX_TICKERS = {
     "NIFTY 50": "^NSEI",
@@ -315,7 +315,7 @@ def fetch_history(ticker: str, period: str = "1y", interval: str = "1d") -> list
                 "close": float(row["Close"]),
                 "volume": int(row["Volume"]),
             })
-        _mcache.set(cache_key, out, 300)  # 5 min
+        _mcache.set(cache_key, out, 1800)  # 30 min
         return out
     except Exception:
         return []
