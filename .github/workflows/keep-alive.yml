@@ -1,0 +1,20 @@
+name: Keep Render instance warm
+
+on:
+  schedule:
+    # Every 10 minutes — comfortably under Render free tier's 15-minute
+    # idle-spindown window, so the app should never cold-start for a user.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping TradeLab
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://tradelab-cdzs.onrender.com/)
+          echo "Response: $code"
+          if [ "$code" -ge 500 ]; then
+            echo "::warning::TradeLab responded with $code"
+          fi
