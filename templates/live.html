@@ -47,7 +47,7 @@
   class="w-full bg-panel border border-slate-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent font-mono"
   data-autocomplete="ticker" autocomplete="off" spellcheck="false" />
   </div>
-  <button class="bg-accent hover:bg-emerald-400 text-base font-semibold px-5 rounded-lg transition">Go →</button>
+  <button class="btn btn-primary">Go →</button>
   </form>
 
   {% if quote %}
@@ -334,7 +334,7 @@
   class="w-full bg-panel2 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-accent font-mono" />
   </div>
   <div class="flex items-end">
-  <button class="bg-accent hover:bg-emerald-400 text-base font-semibold px-5 py-2 rounded-lg transition w-full">Size Trade →
+  <button class="btn btn-primary w-full">Size Trade →
   </button>
   </div>
   </form>
@@ -374,7 +374,7 @@
   <input type="hidden" name="ticker" value="{{ ticker }}" />
   <input type="hidden" name="amount" value="{{ form_amount }}" />
   <input type="hidden" name="risk" value="{{ form_risk }}" />
-  <button class="bg-accent hover:bg-emerald-400 text-sm font-semibold px-4 py-2 rounded-lg transition">
+  <button class="btn btn-primary btn-sm">
   + Add to Basket
   </button>
   <span class="text-[11px] text-muted ml-2">Queue this trade alongside others for the day</span>

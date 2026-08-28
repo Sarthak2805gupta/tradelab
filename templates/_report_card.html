@@ -130,14 +130,13 @@
   </div>
   <div class="flex gap-2 mt-2 justify-end">
   <button onclick="document.getElementById('portfolio-modal').classList.remove('hidden')"
-  class="text-xs bg-accent hover:bg-emerald-400 text-base font-semibold px-3 py-1.5 rounded-lg transition">
+  class="btn btn-primary btn-sm">
   + Portfolio
   </button>
   <form method="post" action="{% url 'watchlist_add' %}">
   {% csrf_token %}
   <input type="hidden" name="ticker" value="{{ report.ticker }}" />
-  <button type="submit"
-  class="text-xs bg-panel2 hover:bg-slate-600 border border-slate-700 text-white font-semibold px-3 py-1.5 rounded-lg transition">
+  <button type="submit" class="btn btn-outline btn-sm">
   + Watchlist
   </button>
   </form>
@@ -170,8 +169,7 @@
   </div>
   </div>
   <div class="flex gap-3 mt-5">
-  <button type="submit"
-  class="flex-1 bg-accent hover:bg-emerald-400 text-base font-semibold py-2 rounded-lg transition">Add to Portfolio
+  <button type="submit" class="btn btn-primary flex-1">Add to Portfolio
   </button>
   <button type="button" onclick="document.getElementById('portfolio-modal').classList.add('hidden')"
   class="flex-1 bg-panel2 hover:bg-slate-600 border border-slate-700 text-white font-semibold py-2 rounded-lg transition">Cancel

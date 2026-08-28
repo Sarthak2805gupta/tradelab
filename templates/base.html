@@ -311,6 +311,37 @@
   }
   .spotlight:hover::after { opacity: 1; }
 
+  /* ── Buttons — one shared system instead of ad-hoc bg-accent/inline styles ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: Inter, system-ui, sans-serif; font-weight: 600; font-size: 13.5px;
+    padding: 10px 20px; border-radius: 11px; border: 1px solid transparent;
+    cursor: pointer; text-decoration: none; white-space: nowrap;
+    transition: transform .15s cubic-bezier(.2,.8,.2,1), box-shadow .2s, border-color .15s, background .15s, color .15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-primary {
+    color: #06120c;
+    background: linear-gradient(135deg, var(--sa-accent), #10b981 55%, #0d9668);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 10px 24px -10px rgba(52,211,153,0.55);
+  }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 14px 30px -10px rgba(52,211,153,0.7); }
+  html.light .btn-primary { color: #ffffff; box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 10px 24px -10px rgba(5,150,105,0.45); }
+
+  .btn-outline {
+    color: var(--sa-ink); background: transparent; border-color: var(--sa-border2);
+  }
+  .btn-outline:hover:not(:disabled) { border-color: var(--sa-accent); color: var(--sa-accent); }
+
+  .btn-ghost {
+    color: var(--sa-muted); background: transparent;
+  }
+  .btn-ghost:hover:not(:disabled) { color: var(--sa-ink); background: var(--sa-nav-hover); }
+
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 9px; }
+
   /* ── Global <select> styling — unified dropdown look site-wide ── */
   select {
     appearance: none;
@@ -430,8 +461,8 @@
         <a href="{% url 'account_logout' %}" style="font-size:11px;color:var(--sa-muted);border-left:1px solid var(--sa-border2);padding-left:10px;">Sign out</a>
       </div>
     {% else %}
-      <a href="{% url 'account_signup' %}" style="font-size:12.5px;color:var(--sa-muted);font-weight:500;">Create account</a>
-      <a href="{% url 'account_login' %}" style="font-size:12.5px;font-weight:700;padding:8px 18px;border-radius:10px;background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;">Sign in</a>
+      <a href="{% url 'account_signup' %}" class="btn btn-ghost" style="padding:8px 14px;">Create account</a>
+      <a href="{% url 'account_login' %}" class="btn btn-primary" style="padding:8px 18px;">Sign in</a>
     {% endif %}
   </header>
   <!-- Mobile top bar -->
@@ -1208,9 +1239,9 @@ document.addEventListener("click", function(e) {
       Sign in to save your portfolio, watchlist, and quiz progress — or continue as a guest to explore.
     </p>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <a href="{% url 'account_login' %}" style="display:block;padding:11px 18px;border-radius:11px;background:linear-gradient(135deg,var(--sa-accent),#10b981);color:#fff;font-weight:700;font-size:14px;text-decoration:none;">Sign in</a>
-      <a href="{% url 'account_signup' %}" style="display:block;padding:11px 18px;border-radius:11px;border:1px solid var(--sa-border2);color:var(--sa-ink);font-weight:600;font-size:14px;text-decoration:none;">Create account</a>
-      <button type="button" id="welcome-guest" style="background:transparent;border:none;color:var(--sa-muted);font-size:12.5px;padding:8px;cursor:pointer;margin-top:2px;">Continue as guest →</button>
+      <a href="{% url 'account_login' %}" class="btn btn-primary" style="font-size:14px;">Sign in</a>
+      <a href="{% url 'account_signup' %}" class="btn btn-outline" style="font-size:14px;">Create account</a>
+      <button type="button" id="welcome-guest" class="btn btn-ghost" style="font-size:12.5px;margin-top:2px;">Continue as guest →</button>
     </div>
   </div>
 </div>
