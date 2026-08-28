@@ -380,6 +380,7 @@
 <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 <body class="min-h-screen flex">
+{% csrf_token %}
 
 <aside class="sidebar hidden md:flex w-60 flex-col h-screen sticky top-0 shrink-0">
   <div class="px-5 pt-5 pb-4 border-b" style="border-color: var(--sa-border);">

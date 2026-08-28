@@ -18,7 +18,6 @@ import requests as _requests
 
 from django.http import HttpResponse, StreamingHttpResponse, JsonResponse
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 # Trigger sys.path injection for the ported flat-import modules
@@ -261,7 +260,6 @@ def screener_stream(request):
 
 # ── Backtester ─────────────────────────────────────────────────────────
 
-@csrf_exempt
 @require_POST
 def backtest_run(request):
     try:
@@ -710,7 +708,6 @@ def _read_json_body(request) -> dict:
         return {}
 
 
-@csrf_exempt
 @require_POST
 def tools_confluence(request):
     data = _read_json_body(request)
@@ -761,7 +758,6 @@ def tools_confluence(request):
         return _json_response({"success": False, "error": str(exc), "trace": traceback.format_exc()}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def tools_sr(request):
     data = _read_json_body(request)
@@ -807,7 +803,6 @@ def tools_sr(request):
         return _json_response({"success": False, "error": str(exc), "trace": traceback.format_exc()}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def tools_rs_ranker(request):
     data = _read_json_body(request)
@@ -846,7 +841,6 @@ def tools_rs_ranker(request):
         return _json_response({"success": False, "error": str(exc), "trace": traceback.format_exc()}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def tools_monte_carlo(request):
     data = _read_json_body(request)
@@ -886,7 +880,6 @@ def tools_monte_carlo(request):
         return _json_response({"success": False, "error": str(exc), "trace": traceback.format_exc()}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def tools_portfolio_risk(request):
     data = _read_json_body(request)
@@ -942,7 +935,6 @@ def tools_portfolio_risk(request):
         return _json_response({"success": False, "error": str(exc), "trace": traceback.format_exc()}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def tools_pairs(request):
     data = _read_json_body(request)
@@ -992,7 +984,6 @@ def tools_pairs(request):
         return _json_response({"success": False, "error": str(exc), "trace": traceback.format_exc()}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def tools_supertrend(request):
     data = _read_json_body(request)
