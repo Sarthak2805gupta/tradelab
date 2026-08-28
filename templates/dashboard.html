@@ -46,7 +46,7 @@
     Welcome back, <span class="gradient-text">{% if user.is_authenticated %}{{ user.username }}{% else %}trader{% endif %}</span>.
   </h2>
   <p style="color:var(--sa-muted);font-size:14.5px;margin-top:14px;max-width:60ch;line-height:1.6;">
-    Live Indian indices, top movers, and your portfolio snapshot. Click any ticker to drill into a full analysis — or jump to the <a href="{% url 'screener' %}" style="color:var(--sa-accent);">Screener</a> to scan for fresh ideas.
+    Live Indian indices, top movers, and your portfolio snapshot. Click any ticker to drill into a full analysis.
   </p>
 </div>
 
@@ -93,38 +93,6 @@
   </div>
 </section>
 {% endif %}
-
-<!-- ═══ Ranked Screener Picks (from screener_v3) ═══════════════════════ -->
-<section class="card p-6 mb-10">
-  <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
-    <div>
-      <div class="eyebrow mb-1">Top Screener Picks · Nifty 50</div>
-      <h3 class="font-display text-xl font-bold">Ranked by multi-factor score</h3>
-      <p class="text-muted text-xs mt-1">Weighted screen across trend, momentum, volume, liquidity, and relative strength. Regime-aware qualify threshold. Refreshes hourly.</p>
-    </div>
-    <div class="text-right">
-      <div id="sp-regime" class="text-[10px] text-muted uppercase tracking-wider font-mono">—</div>
-      <a href="{% url 'screener' %}" class="text-xs text-accent hover:text-emerald-400 mt-1 inline-block">Open Screener →</a>
-    </div>
-  </div>
-  <div id="sp-status" class="text-xs text-muted">Computing Nifty 50 rankings… this may take 30-60 seconds on first load.</div>
-  <div id="sp-list" class="hidden overflow-x-auto">
-    <table class="w-full text-xs font-mono">
-      <thead class="text-muted uppercase">
-        <tr>
-          <th class="text-left py-2 pr-3">#</th>
-          <th class="text-left pr-3">Ticker</th>
-          <th class="text-right pr-3">Score</th>
-          <th class="text-right pr-3">RSI</th>
-          <th class="text-right pr-3">ADX</th>
-          <th class="text-right pr-3">1M Chg</th>
-          <th class="text-right pr-3">Liq</th>
-        </tr>
-      </thead>
-      <tbody id="sp-tbody"></tbody>
-    </table>
-  </div>
-</section>
 
 <!-- Movers -->
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 stagger">
@@ -250,51 +218,4 @@
   </div>
 </section>
 
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  const status = document.getElementById("sp-status");
-  const list = document.getElementById("sp-list");
-  const tbody = document.getElementById("sp-tbody");
-  const regimeEl = document.getElementById("sp-regime");
-  if (!status) return;
-
-  function esc(s) { const d = document.createElement("div"); d.textContent = String(s || ""); return d.innerHTML; }
-
-  fetch("/screener/api/dashboard/top-picks")
-    .then(r => r.json())
-    .then(d => {
-      if (!d.success || !d.top || !d.top.length) {
-        status.textContent = d.error ? ("Couldn't compute picks: " + d.error) : "No picks available right now.";
-        return;
-      }
-      const reg = d.regime || {};
-      regimeEl.textContent = `${reg.regime || '—'} market · qualify score ${reg.qualify_score ?? '?'}${d.cached ? ' · cached' : ''}`;
-      tbody.innerHTML = d.top.map((r, i) => {
-        const chg = r["1M_Chg%"];
-        const chgCls = chg > 0 ? "text-emerald-400" : "text-rose-400";
-        const liqCls = (r.Liq_Grade || "") === "A" ? "text-emerald-400"
-                    : (r.Liq_Grade || "") === "B" ? "text-emerald-300"
-                    : "text-amber-400";
-        const tick = (r.Ticker || "").replace(".NS", "");
-        return `<tr class="border-t border-white/5 hover:bg-white/5 cursor-pointer" onclick="location.href='/analysis/?ticker=${esc(tick)}'">
-          <td class="py-2 pr-3 text-muted">${i + 1}</td>
-          <td class="pr-3 font-bold text-slate-100">${esc(tick)}</td>
-          <td class="text-right pr-3 text-emerald-400 font-bold">${(r.Score ?? 0).toFixed(1)}</td>
-          <td class="text-right pr-3 text-slate-300">${(r.RSI ?? 0).toFixed(0)}</td>
-          <td class="text-right pr-3 text-slate-300">${(r.ADX ?? 0).toFixed(0)}</td>
-          <td class="text-right pr-3 ${chgCls}">${chg != null ? (chg > 0 ? '+' : '') + chg.toFixed(1) + '%' : '—'}</td>
-          <td class="text-right pr-3 ${liqCls}">${esc(r.Liq_Grade || '?')}</td>
-        </tr>`;
-      }).join("");
-      status.classList.add("hidden");
-      list.classList.remove("hidden");
-    })
-    .catch(e => {
-      status.textContent = "Couldn't load picks: " + e.message;
-    });
-})();
-</script>
 {% endblock %}

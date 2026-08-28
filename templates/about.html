@@ -185,10 +185,6 @@
       <div class="t">Risk Analyser</div>
       <div class="d">Volatility-based screener ranking stocks that fit your capital + loss tolerance.</div>
     </a>
-    <a class="feature-tile" href="{% url 'screener' %}" style="text-decoration:none">
-      <div class="t">Screener</div>
-      <div class="d">Multi-factor ranking + 9-strategy backtester. Tune weights, save scans, export CSV.</div>
-    </a>
     <a class="feature-tile" href="{% url 'portfolio' %}" style="text-decoration:none">
       <div class="t">Portfolio</div>
       <div class="d">Track holdings and P&amp;L with per-stock price journey since buy date.</div>
@@ -265,8 +261,8 @@
     </div>
     <p class="text-sm text-muted leading-relaxed">
       All technical indicators (SMA, RSI, MACD, Bollinger, ATR, ADX, Supertrend) are computed
-      from scratch in pure pandas/numpy — no TA libraries. The screener runs its network fetches
-      in a 16-thread pool, cutting Nifty-50 scan time roughly 10×. Charts are drawn natively on
+      from scratch in pure pandas/numpy — no TA libraries. Dashboard quotes and top movers fetch
+      in a thread pool to keep page loads fast even on a cold cache. Charts are drawn natively on
       HTML5 canvas — no external chart library.
     </p>
   </div>

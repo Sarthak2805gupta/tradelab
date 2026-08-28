@@ -7,9 +7,9 @@
 <title>{% block title %}TradeLab — Indian Markets{% endblock %}</title>
 <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
 <meta name="theme-color" content="#07090f">
-<meta name="description" content="TradeLab — a planning desk for Indian retail investors. Live quotes, analysis, screener, portfolio, and learning in one place.">
+<meta name="description" content="TradeLab — a planning desk for Indian retail investors. Live quotes, analysis, portfolio, and learning in one place.">
 <meta property="og:title" content="TradeLab — Indian Markets">
-<meta property="og:description" content="Dashboards, screeners and tools for Indian equity markets.">
+<meta property="og:description" content="Dashboards and tools for Indian equity markets.">
 <meta property="og:type" content="website">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -398,7 +398,6 @@
     <a href="{% url 'analysis' %}"      class="nav-item {% if active == 'analysis' %}active{% endif %}"><span class="nav-dot"></span>Analysis</a>
     <a href="{% url 'commodities' %}"   class="nav-item {% if active == 'commodities' %}active{% endif %}"><span class="nav-dot"></span>Commodities</a>
     <a href="{% url 'risk_analyser' %}" class="nav-item {% if active == 'risk_analyser' %}active{% endif %}"><span class="nav-dot"></span>Risk Analyser</a>
-    <a href="{% url 'screener' %}"      class="nav-item {% if active == 'screener' %}active{% endif %}"><span class="nav-dot"></span>Screener</a>
     <a href="{% url 'what_if' %}"       class="nav-item {% if active == 'what_if' %}active{% endif %}"><span class="nav-dot"></span>What If</a>
     <a href="{% url 'sip' %}"           class="nav-item {% if active == 'sip' %}active{% endif %}"><span class="nav-dot"></span>SIP Calculator</a>
 
@@ -448,7 +447,6 @@
         <a class="nav-item" href="{% url 'analysis' %}"><span class="nav-dot"></span>Analysis</a>
         <a class="nav-item" href="{% url 'commodities' %}"><span class="nav-dot"></span>Commodities</a>
         <a class="nav-item" href="{% url 'risk_analyser' %}"><span class="nav-dot"></span>Risk Analyser</a>
-        <a class="nav-item" href="{% url 'screener' %}"><span class="nav-dot"></span>Screener</a>
         <a class="nav-item" href="{% url 'portfolio' %}"><span class="nav-dot"></span>Portfolio</a>
         <a class="nav-item" href="{% url 'watchlist' %}"><span class="nav-dot"></span>Watchlist</a>
         <a class="nav-item" href="{% url 'learning' %}"><span class="nav-dot"></span>Learning Center</a>
@@ -654,9 +652,9 @@ document.addEventListener("click", function(e) {
 {% with active=request.resolver_match.url_name %}
 <nav class="bottom-tabs">
   <a href="{% url 'dashboard' %}" class="{% if active == 'dashboard' %}on{% endif %}"><span class="ic">🏠</span><span>Home</span></a>
-  <a href="{% url 'screener' %}"  class="{% if active == 'screener' %}on{% endif %}"><span class="ic">🔎</span><span>Screener</span></a>
   <a href="{% url 'analysis' %}"  class="{% if active == 'analysis' %}on{% endif %}"><span class="ic">📊</span><span>Analysis</span></a>
   <a href="{% url 'portfolio' %}" class="{% if active == 'portfolio' %}on{% endif %}"><span class="ic">💼</span><span>Portfolio</span></a>
+  <a href="{% url 'watchlist' %}" class="{% if active == 'watchlist' %}on{% endif %}"><span class="ic">👁</span><span>Watchlist</span></a>
   <a href="{% url 'learning' %}"  class="{% if active == 'learning' %}on{% endif %}"><span class="ic">📘</span><span>Learn</span></a>
 </nav>
 {% endwith %}
@@ -710,7 +708,6 @@ document.addEventListener("click", function(e) {
     { kind: "page", name: "Analysis",         ticker: "analysis", href: "{% url 'analysis' %}" },
     { kind: "page", name: "Commodities",      ticker: "gold",     href: "{% url 'commodities' %}" },
     { kind: "page", name: "Risk Analyser",    ticker: "risk",     href: "{% url 'risk_analyser' %}" },
-    { kind: "page", name: "Screener",         ticker: "scan",     href: "{% url 'screener' %}" },
     { kind: "page", name: "Portfolio",        ticker: "folio",    href: "{% url 'portfolio' %}" },
     { kind: "page", name: "Watchlist",        ticker: "watch",    href: "{% url 'watchlist' %}" },
     { kind: "page", name: "Learning Center",  ticker: "learn",    href: "{% url 'learning' %}" },
@@ -823,7 +820,6 @@ document.addEventListener("click", function(e) {
     <h3>Keyboard shortcuts</h3>
     <div class="kbd-row"><span>Quick search / jump to page</span><div class="kbd-keys"><span class="kbd-key">⌘</span><span class="kbd-key">K</span></div></div>
     <div class="kbd-row"><span>Go to Dashboard</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">d</span></div></div>
-    <div class="kbd-row"><span>Go to Screener</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">s</span></div></div>
     <div class="kbd-row"><span>Go to Analysis</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">a</span></div></div>
     <div class="kbd-row"><span>Go to Live</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">l</span></div></div>
     <div class="kbd-row"><span>Go to Portfolio</span><div class="kbd-keys"><span class="kbd-key">g</span><span class="kbd-key">p</span></div></div>
@@ -838,7 +834,6 @@ document.addEventListener("click", function(e) {
 (function () {
   var urls = {
     d: "{% url 'dashboard' %}",
-    s: "{% url 'screener' %}",
     a: "{% url 'analysis' %}",
     l: "{% url 'live' %}",
     p: "{% url 'portfolio' %}",
