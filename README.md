@@ -27,8 +27,7 @@ mysql -u root -p -e "CREATE DATABASE stockapp_db CHARACTER SET utf8mb4;"
 
 # 5. migrate, load learning content, and run
 python manage.py makemigrations
-python manage.py migrate
-python manage.py createcachetable
+python manage.py migrate          # also creates the cache table
 python manage.py loaddata learning_modules.json
 python manage.py createsuperuser   # optional, for admin + per-user data
 python manage.py runserver
@@ -98,7 +97,7 @@ stockapp-project/
 
 - One Yahoo request per ticker (1 year of daily bars + live quote metadata); shorter daily windows are sliced from it.
 - Shared cache (`CACHE_BACKEND=db`, the default) for history, fundamentals and 5-minute analysis reports, so all
-  gunicorn workers and restarts reuse the same data. Run `python manage.py createcachetable` once (the Procfile release step does).
+  gunicorn workers and restarts reuse the same data. `migrate` creates its table.
 - Pages never wait more than ~4 s on Yahoo; slow symbols finish in the background and are cached for the next view.
 - A background thread keeps the dashboard tickers warm while the server is up (`PREWARM_IN_PROCESS=false` to turn off).
 - On Render's free plan the instance sleeps after 15 idle minutes and takes ~30-60 s to wake. The keep-alive workflow
