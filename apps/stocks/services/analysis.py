@@ -66,8 +66,16 @@ def _analyze_uncached(ticker: str) -> dict:
 
     ind = indicators.compute_all(df)
 
-    # Trend from SMA stack
-    if ind["sma20"] and ind["sma50"]:
+    # Trend label: the 200-day average when there's enough history (it is
+    # what the backtested score uses), else the short SMA stack.
+    if ind.get("sma200") and ind.get("close"):
+        if ind["close"] > ind["sma200"] * 1.05:
+            trend = "Uptrend"
+        elif ind["close"] < ind["sma200"] * 0.95:
+            trend = "Downtrend"
+        else:
+            trend = "Sideways"
+    elif ind["sma20"] and ind["sma50"]:
         if ind["sma20"] > ind["sma50"] * 1.01:
             trend = "Uptrend"
         elif ind["sma20"] < ind["sma50"] * 0.99:
@@ -118,6 +126,24 @@ def _analyze_uncached(ticker: str) -> dict:
                 f"Recent prices (last ~1 month avg ₹{ind['sma20']:,.2f}) are running "
                 f"below the longer-term average (₹{ind['sma50']:,.2f}) — the stock has been cooling off."
             )
+
+    if ind.get("sma200") and ind.get("close"):
+        gap = (ind["close"] / ind["sma200"] - 1) * 100
+        side = "above" if gap >= 0 else "below"
+        reasons.append(
+            f"Price is {abs(gap):.0f}% {side} its 200-day average (₹{ind['sma200']:,.2f}) — "
+            + ("the long-term trend is up." if gap > 5 else "the long-term trend is down." if gap < -5 else "no strong long-term trend.")
+        )
+    if ind.get("momentum_11m") is not None:
+        mom = ind["momentum_11m"] * 100
+        reasons.append(
+            f"Over the past ~11 months (leaving out the latest month) it has returned {mom:+.0f}% — "
+            + ("strong momentum, which in our backtest tended to persist." if mom > 10
+               else "weak momentum, which in our backtest tended to keep lagging." if mom < -10
+               else "middling momentum.")
+        )
+    if ind.get("pct_of_high") is not None:
+        reasons.append(f"It trades at {ind['pct_of_high'] * 100:.0f}% of its 1-year high.")
 
     if rsi_v > 65:
         rsi_plain = "looking overheated, buyers may be tiring"
@@ -209,27 +235,30 @@ def _compute_buy_rating(ind: dict, fin: dict | None, rsi_v: float, fundamentals:
     tech_earned = 0
     trend_score = ind.get("score", 0) if ind else 0
 
-    # Trend: 0-1.5
-    if trend_score >= 2:
-        t = 1.5
+    # Trend: 0-1.5, from the backtested score (-3..+3; see indicators.py)
+    TREND_PTS = {3: 1.5, 2: 1.25, 1: 1.0, 0: 0.75, -1: 0.4, -2: 0.15, -3: 0.0}
+    t = TREND_PTS.get(max(-3, min(3, trend_score)), 0.75)
+    if trend_score >= 3:
         factors.append({"label": "Strong trend", "pts": "1.5 / 1.5", "positive": True, "cat": "Technicals",
-            "why": "All trend indicators agree — price climbing on all timeframes."})
+            "why": "Above its 200-day average, strong 11-month momentum and near its 1-year high."})
+    elif trend_score == 2:
+        factors.append({"label": "Uptrend", "pts": "1.25 / 1.5", "positive": True, "cat": "Technicals",
+            "why": "Two of the three long-term trend signals point up."})
     elif trend_score == 1:
-        t = 1.0
         factors.append({"label": "Mild uptrend", "pts": "1 / 1.5", "positive": True, "cat": "Technicals",
-            "why": "Most indicators point up. Trend favours buyers, just not strongly."})
+            "why": "Trend signals lean up, just not strongly."})
     elif trend_score == 0:
-        t = 0.75
         factors.append({"label": "No clear trend", "pts": "0.75 / 1.5", "positive": None, "cat": "Technicals",
             "why": "Signals cancel out. Stock is drifting sideways."})
     elif trend_score == -1:
-        t = 0.3
-        factors.append({"label": "Mild downtrend", "pts": "0.3 / 1.5", "positive": False, "cat": "Technicals",
-            "why": "More indicators point down. Momentum working against buyers."})
+        factors.append({"label": "Mild downtrend", "pts": "0.4 / 1.5", "positive": False, "cat": "Technicals",
+            "why": "Trend signals lean down. Momentum working against buyers."})
+    elif trend_score == -2:
+        factors.append({"label": "Downtrend", "pts": "0.15 / 1.5", "positive": False, "cat": "Technicals",
+            "why": "Two of the three long-term trend signals point down."})
     else:
-        t = 0
         factors.append({"label": "Strong downtrend", "pts": "0 / 1.5", "positive": False, "cat": "Technicals",
-            "why": "Every indicator is negative. Buying here is catching a falling knife."})
+            "why": "Below its 200-day average, weak momentum and far from its 1-year high. Buying here is catching a falling knife."})
     tech_earned += t
 
     # MACD: 0-0.5
@@ -265,7 +294,26 @@ def _compute_buy_rating(ind: dict, fin: dict | None, rsi_v: float, fundamentals:
     sub_scores["Technicals"] = {"earned": round(tech_earned, 2), "max": 2.5}
 
     # === MOMENTUM (0-2 points) ===
-    if 50 <= rsi_v <= 65:
+    # Backtest (224 NSE stocks, 2017-2026): the 11-month return predicted the
+    # next 1-3 months; RSI zones did not (and "overbought" RSI > 75 stocks
+    # actually did slightly better). RSI is only used when history is short.
+    mom = ind.get("momentum_11m") if ind else None
+    if mom is not None:
+        mp = mom * 100
+        if mom > 0.40:
+            m, why, pos = 2.0, "Very strong 11-month run. Winners like this have tended to keep outperforming.", True
+        elif mom > 0.20:
+            m, why, pos = 1.75, "Strong 11-month gain — momentum on its side.", True
+        elif mom > 0.10:
+            m, why, pos = 1.5, "Solid 11-month gain.", True
+        elif mom > 0:
+            m, why, pos = 1.0, "Small gain over 11 months. No real momentum either way.", None
+        elif mom > -0.10:
+            m, why, pos = 0.5, "Slightly down over 11 months.", None
+        else:
+            m, why, pos = 0.0, "Down sharply over 11 months. Laggards have tended to keep lagging.", False
+        factors.append({"label": f"11-month return {mp:+.0f}%", "pts": f"{m:g} / 2", "positive": pos, "cat": "Momentum", "why": why})
+    elif 50 <= rsi_v <= 65:
         m = 2.0
         factors.append({"label": f"RSI {rsi_v:.0f} — ideal", "pts": "2 / 2", "positive": True, "cat": "Momentum",
             "why": f"Buyers in control, not overextended. Sweet spot for entry."})

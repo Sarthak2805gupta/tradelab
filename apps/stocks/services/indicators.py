@@ -12,6 +12,20 @@ Accuracy notes (see git history for the before/after):
   * bollinger() uses the population standard deviation (ddof=0), which is
     how Bollinger Bands are defined and how charting platforms draw them.
     pandas' default (ddof=1) made the bands ~2.6% too wide at window=20.
+
+Trend score (compute_all "score" / "verdict"), reworked after a backtest:
+  The old score added up SMA20-vs-SMA50, RSI>60/<40 and MACD-vs-signal.
+  Replaying it weekly on 224 NSE stocks over 2017-2026 showed no edge: its
+  "BULLISH" picks did no better than its "BEARISH" ones over the next 1-3
+  months (rank correlation with 3-month excess return about -0.005). The
+  three signals that did predict, in both 2017-22 and 2023-26, were:
+    * price vs its 200-day average (long-term trend),
+    * the 11-month return excluding the latest month (price momentum),
+    * how close the price is to its 1-year high.
+  Each now votes +1 / 0 / -1, so the score keeps its -3..+3 range and the
+  BULLISH (>= 2) / BEARISH (<= -2) cut-offs. The windows fit inside the
+  ~1 year of daily bars the site already fetches. The backtest script lives
+  in tools/backtest/.
 """
 from __future__ import annotations
 
@@ -73,6 +87,44 @@ def support_resistance(df: pd.DataFrame, lookback: int = 30) -> dict:
     }
 
 
+MOMENTUM_SKIP = 21        # leave out the latest month (short-term reversal noise)
+MOMENTUM_LOOKBACK = 230   # ~11 months; fits in a 1y daily fetch (~245 bars)
+HIGH_WINDOW = 231
+HIGH_MIN_BARS = 200
+
+
+def momentum_11_1(close: pd.Series) -> float | None:
+    """Return from ~11 months ago to 1 month ago, or None without enough history."""
+    if len(close) <= MOMENTUM_LOOKBACK:
+        return None
+    start = float(close.iloc[-1 - MOMENTUM_LOOKBACK])
+    end = float(close.iloc[-1 - MOMENTUM_SKIP])
+    if not start or math.isnan(start) or math.isnan(end):
+        return None
+    return end / start - 1
+
+
+def pct_of_year_high(close: pd.Series) -> float | None:
+    """Latest close as a fraction of the highest close of the past ~year."""
+    if len(close) < HIGH_MIN_BARS:
+        return None
+    hi = float(close.tail(HIGH_WINDOW).max())
+    return float(close.iloc[-1]) / hi if hi else None
+
+
+def trend_votes(close: float | None, sma200: float | None, mom: float | None, pct_high: float | None) -> dict:
+    """The three backtested trend votes (+1 / 0 / -1 each, 0 when data is missing)."""
+    votes = {"long_trend": 0, "momentum": 0, "year_high": 0}
+    if close and sma200:
+        gap = close / sma200 - 1
+        votes["long_trend"] = 1 if gap > 0.05 else (-1 if gap < -0.05 else 0)
+    if mom is not None:
+        votes["momentum"] = 1 if mom > 0.10 else (-1 if mom < -0.10 else 0)
+    if pct_high is not None:
+        votes["year_high"] = 1 if pct_high >= 0.90 else (-1 if pct_high < 0.75 else 0)
+    return votes
+
+
 def _last(s: pd.Series) -> float | None:
     """Latest value as a float, or None when the series is empty or still warming up (NaN)."""
     if not len(s):
@@ -89,6 +141,7 @@ def compute_all(df: pd.DataFrame) -> dict:
     close = df["Close"].astype(float)
     sma20 = sma(close, 20)
     sma50 = sma(close, 50)
+    sma200 = sma(close, 200)
     rsi14 = rsi(close, 14)
     macd_d = macd(close)
     bb = bollinger(close)
@@ -100,23 +153,13 @@ def compute_all(df: pd.DataFrame) -> dict:
     latest_rsi = _last(rsi14)
     latest_macd = _last(macd_d["macd"])
     latest_signal = _last(macd_d["signal"])
+    latest_sma200 = _last(sma200)
+    mom = momentum_11_1(close)
+    pct_high = pct_of_year_high(close)
 
-    # Score-based signal
-    score = 0
-    if latest_sma20 and latest_sma50 and latest_sma20 > latest_sma50:
-        score += 1
-    elif latest_sma20 and latest_sma50:
-        score -= 1
-    if latest_rsi is not None:
-        if latest_rsi > 60:
-            score += 1
-        elif latest_rsi < 40:
-            score -= 1
-    if latest_macd is not None and latest_signal is not None:
-        if latest_macd > latest_signal:
-            score += 1
-        else:
-            score -= 1
+    # Score-based signal: the three backtested trend votes (see module docstring)
+    votes = trend_votes(latest_close, latest_sma200, mom, pct_high)
+    score = sum(votes.values())
 
     if score >= 2:
         verdict = "BULLISH"
@@ -129,6 +172,10 @@ def compute_all(df: pd.DataFrame) -> dict:
         "close": latest_close,
         "sma20": latest_sma20,
         "sma50": latest_sma50,
+        "sma200": latest_sma200,
+        "momentum_11m": mom,
+        "pct_of_high": pct_high,
+        "votes": votes,
         "rsi": latest_rsi,
         "macd": latest_macd,
         "macd_signal": latest_signal,

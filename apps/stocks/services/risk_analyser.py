@@ -90,7 +90,14 @@ def _analyse_one(symbol: dict, horizon_days: int = TRADING_DAYS_PER_MONTH) -> di
     df = pd.DataFrame(bars).rename(columns={
         "open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume",
     })
-    ind = indicators.compute_all(df)
+    # The trend score needs ~1 year of bars (200-day average, 11-month
+    # momentum). Both periods are sliced from the same cached 1y download, so
+    # this costs no extra Yahoo call; the downside maths keeps its 6 months.
+    year_bars = fetch_history(ticker, period="1y", interval="1d") or bars
+    year_df = pd.DataFrame(year_bars).rename(columns={
+        "open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume",
+    })
+    ind = indicators.compute_all(year_df)
     if not ind:
         return None
     closes = df["Close"].astype(float)

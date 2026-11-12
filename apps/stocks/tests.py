@@ -128,3 +128,51 @@ class IndicatorAccuracyTests(TestCase):
         _, concerns_other = _assess(snap, latest, None, None, sector="Industrials")
         self.assertFalse(any("leverage" in c.lower() for c in concerns_bank))
         self.assertTrue(any("leverage" in c.lower() for c in concerns_other))
+
+
+class TradeRuleTests(TestCase):
+    """The backtested trend score and the buy-rating pieces built on it."""
+
+    def _df(self, closes):
+        import pandas as pd
+        closes = pd.Series([float(c) for c in closes])
+        return pd.DataFrame({"Open": closes, "High": closes * 1.01, "Low": closes * 0.99,
+                             "Close": closes, "Volume": 1_000_000})
+
+    def test_steady_uptrend_is_bullish(self):
+        from apps.stocks.services import indicators
+        ind = indicators.compute_all(self._df([100 * 1.002 ** i for i in range(247)]))
+        self.assertEqual(ind["votes"], {"long_trend": 1, "momentum": 1, "year_high": 1})
+        self.assertEqual(ind["verdict"], "BULLISH")
+
+    def test_steady_downtrend_is_bearish(self):
+        from apps.stocks.services import indicators
+        ind = indicators.compute_all(self._df([100 * 0.998 ** i for i in range(247)]))
+        self.assertEqual(ind["score"], -3)
+        self.assertEqual(ind["verdict"], "BEARISH")
+
+    def test_short_history_is_neutral_not_guessed(self):
+        from apps.stocks.services import indicators
+        ind = indicators.compute_all(self._df([100 * 1.01 ** i for i in range(60)]))
+        self.assertIsNone(ind["sma200"])
+        self.assertIsNone(ind["momentum_11m"])
+        self.assertEqual(ind["score"], 0)
+
+    def test_momentum_skips_latest_month(self):
+        from apps.stocks.services import indicators
+        import pandas as pd
+        closes = [100.0] * 226 + [150.0] * 21   # jump only in the last month
+        self.assertAlmostEqual(indicators.momentum_11_1(pd.Series(closes)), 0.0)
+
+    def test_overbought_rsi_no_longer_zeroes_momentum(self):
+        from apps.stocks.services.analysis import _compute_buy_rating
+        ind = {"score": 3, "macd": 1, "macd_signal": 0, "close": 100, "bb_upper": 103, "bb_lower": 97,
+               "momentum_11m": 0.5}
+        br = _compute_buy_rating(ind, None, 80.0)
+        self.assertEqual(br["sub_scores"]["Momentum"]["earned"], 2.0)
+        self.assertEqual(br["sub_scores"]["Technicals"]["earned"], 2.5)
+
+    def test_rsi_fallback_when_momentum_unknown(self):
+        from apps.stocks.services.analysis import _compute_buy_rating
+        br = _compute_buy_rating({"score": 0}, None, 55.0)
+        self.assertEqual(br["sub_scores"]["Momentum"]["earned"], 2.0)
