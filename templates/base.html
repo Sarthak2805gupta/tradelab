@@ -23,30 +23,6 @@
     document.documentElement.classList.remove('light');
   })();
 </script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          base:   'var(--sa-base, #07090f)',
-          panel:  'var(--sa-panel, #0f1420)',
-          panel2: 'var(--sa-panel2, #151c2c)',
-          accent:  'var(--sa-accent, #34d399)',
-          accent2: 'var(--sa-accent2, #fbbf24)',
-          danger:  'var(--sa-danger, #fb7185)',
-          muted:   'var(--sa-muted, #8a94a7)',
-          ink:     'var(--sa-ink, #e6ebf3)',
-        },
-        fontFamily: {
-          display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
-          sans: ['Inter', 'system-ui', 'sans-serif'],
-          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
-        },
-      }
-    }
-  };
-</script>
 <style>
   /* ── Theme tokens ─────────────────────────────────────────── */
   :root {
@@ -409,6 +385,8 @@
   }
 </style>
 <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+{# Prebuilt Tailwind (frontend/tailwind.config.js). Kept last in <head>, which is where the old in-browser CDN compiler injected its styles, so the cascade order is unchanged. #}
+<link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
 </head>
 <body class="min-h-screen flex">
 {% csrf_token %}
