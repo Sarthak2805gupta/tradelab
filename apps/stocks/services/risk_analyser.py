@@ -45,14 +45,31 @@ TIMEFRAMES = {
 DEFAULT_TIMEFRAME = "1mo"
 
 
+# RiskMetrics decay factor for the exponentially weighted volatility estimate.
+EWMA_LAMBDA = 0.94
+
+
 def _estimate_downside_pct(closes: pd.Series, horizon_days: int = TRADING_DAYS_PER_MONTH) -> float | None:
-    """Return an estimated 5%-worst-case loss over `horizon_days` trading days, in %."""
+    """
+    Return an estimated 5%-worst-case loss over `horizon_days` trading days, in %.
+
+    Accuracy: volatility is taken as the higher of (a) the plain 60-day sample
+    standard deviation and (b) an exponentially weighted (RiskMetrics,
+    λ=0.94) estimate that reacts to the most recent weeks. A stock that was
+    calm for two months and then started swinging 4% a day would otherwise
+    still be scored as "calm" because the spike is diluted by 50 quiet days.
+    Taking the max keeps the estimate conservative, which is the point of a
+    worst-case number.
+    """
     if closes is None or len(closes) < 30:
         return None
     rets = closes.pct_change().dropna().tail(60)  # last ~3 months of dailies
     if rets.empty:
         return None
-    daily_sigma = float(rets.std())
+    sample_sigma = float(rets.std())
+    ewma_var = float((rets ** 2).ewm(alpha=1 - EWMA_LAMBDA, adjust=False).mean().iloc[-1])
+    ewma_sigma = math.sqrt(ewma_var) if ewma_var > 0 else 0.0
+    daily_sigma = max(sample_sigma, ewma_sigma)
     if daily_sigma == 0:
         return 0.0
     horizon_sigma = daily_sigma * math.sqrt(horizon_days)

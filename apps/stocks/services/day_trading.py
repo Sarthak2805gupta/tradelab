@@ -26,8 +26,14 @@ from .fetcher import fetch_quote, fetch_history
 
 def _atr_pct(bars: list[dict], period: int = 14) -> float | None:
     """
-    Average True Range as a % of current price, over the last `period` daily bars.
+    Average True Range as a % of current price (Wilder's smoothed ATR).
     This is our proxy for 'how much does this stock typically move in a day'.
+
+    Accuracy: the previous version averaged only the last 14 true ranges with
+    equal weight, so a single wild day dropped out of the number abruptly two
+    weeks later and the stop-loss distance jumped with it. Wilder's smoothing
+    (the standard ATR definition) weights recent days more and decays old
+    shocks gradually, which is what every charting platform shows as "ATR".
     """
     if not bars or len(bars) < period + 1:
         return None
@@ -36,15 +42,39 @@ def _atr_pct(bars: list[dict], period: int = 14) -> float | None:
         h = bars[i]["high"]
         l = bars[i]["low"]
         pc = bars[i - 1]["close"]
-        tr = max(h - l, abs(h - pc), abs(l - pc))
-        trs.append(tr)
+        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
     if len(trs) < period:
         return None
-    atr = sum(trs[-period:]) / period
+    atr = sum(trs[:period]) / period          # seed with a simple average
+    for tr in trs[period:]:                   # then Wilder-smooth the rest
+        atr = (atr * (period - 1) + tr) / period
     last_close = bars[-1]["close"]
     if not last_close:
         return None
     return (atr / last_close) * 100.0
+
+
+def _session_fraction_elapsed(now=None) -> float:
+    """
+    How much of today's NSE session (09:15–15:30 IST) has elapsed, 0..1.
+    Returns 1.0 outside market hours / on weekends so a completed day's
+    volume is compared against a full-day average.
+    """
+    from datetime import time as dtime
+    from django.utils import timezone
+    now = now or timezone.localtime()
+    if now.weekday() >= 5:
+        return 1.0
+    open_t, close_t = dtime(9, 15), dtime(15, 30)
+    t = now.time()
+    if t <= open_t:
+        return 1.0
+    if t >= close_t:
+        return 1.0
+    elapsed = (t.hour * 60 + t.minute) - (open_t.hour * 60 + open_t.minute)
+    total = (close_t.hour * 60 + close_t.minute) - (open_t.hour * 60 + open_t.minute)
+    # Floor at 10%: the opening minutes carry a disproportionate share of volume.
+    return max(0.10, min(1.0, elapsed / total))
 
 
 def _avg_volume(bars: list[dict], days: int = 20) -> float | None:
@@ -294,12 +324,16 @@ def intraday_verdict(ticker: str, quote: dict | None = None, bars: list | None =
             signals_bear += 1
             reasons.append("Price is near the day's low — weakness suggests sellers are pressing.")
 
-    # 5. Volume check (only if we have average volume from history)
+    # 5. Volume check (only if we have average volume from history).
+    # Accuracy: mid-session the day's volume is only partially printed, so it
+    # was being compared against a full-day average and almost always read as
+    # "below average" before lunch. Compare against the volume expected so far.
     today_vol = quote.get("volume", 0)
-    if avg_vol and today_vol and today_vol > avg_vol * 1.3:
-        reasons.append(f"Volume is {today_vol/avg_vol:.1f}x the average — the move has institutional conviction behind it.")
-    elif avg_vol and today_vol < avg_vol * 0.5:
-        reasons.append("Volume is below average — any move today lacks conviction and could reverse easily.")
+    expected_so_far = avg_vol * _session_fraction_elapsed() if avg_vol else None
+    if expected_so_far and today_vol and today_vol > expected_so_far * 1.3:
+        reasons.append(f"Volume is {today_vol/expected_so_far:.1f}x the average pace — the move has institutional conviction behind it.")
+    elif expected_so_far and today_vol < expected_so_far * 0.5:
+        reasons.append("Volume is below average pace — any move today lacks conviction and could reverse easily.")
 
     # Verdict
     net = signals_bull - signals_bear

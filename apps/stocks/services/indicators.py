@@ -2,15 +2,27 @@
 Pure-pandas/numpy technical indicators. All functions accept a DataFrame
 with at least a 'Close' column (and 'High'/'Low' where required) and return
 either a Series, dict, or scalar.
+
+Accuracy notes (see git history for the before/after):
+  * sma() needs a full window before it reports a value. Previously an
+    "SMA50" computed on 20 bars was really a 20-bar average, which could
+    flip the trend verdict on short histories.
+  * rsi() returns 100 when there have been no losses in the window (the
+    textbook value) instead of a neutral 50.
+  * bollinger() uses the population standard deviation (ddof=0), which is
+    how Bollinger Bands are defined and how charting platforms draw them.
+    pandas' default (ddof=1) made the bands ~2.6% too wide at window=20.
 """
 from __future__ import annotations
+
+import math
 
 import numpy as np
 import pandas as pd
 
 
 def sma(close: pd.Series, window: int) -> pd.Series:
-    return close.rolling(window=window, min_periods=1).mean()
+    return close.rolling(window=window, min_periods=window).mean()
 
 
 def rsi(close: pd.Series, period: int = 14) -> pd.Series:
@@ -20,7 +32,11 @@ def rsi(close: pd.Series, period: int = 14) -> pd.Series:
     avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
     rs = avg_gain / avg_loss.replace(0, np.nan)
-    return (100 - (100 / (1 + rs))).fillna(50)
+    out = 100 - (100 / (1 + rs))
+    # No losses at all in the window → RSI is 100 by definition; no gains and
+    # no losses (flat price / warm-up) → neutral 50.
+    out = out.where(~((avg_loss == 0) & (avg_gain > 0)), 100.0)
+    return out.fillna(50)
 
 
 def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> dict:
@@ -34,8 +50,17 @@ def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> d
 
 def bollinger(close: pd.Series, window: int = 20, num_std: float = 2.0) -> dict:
     mid = close.rolling(window=window, min_periods=1).mean()
-    std = close.rolling(window=window, min_periods=1).std().fillna(0)
+    std = close.rolling(window=window, min_periods=1).std(ddof=0).fillna(0)
     return {"mid": mid, "upper": mid + num_std * std, "lower": mid - num_std * std}
+
+
+def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """Wilder's Average True Range (the standard smoothed definition)."""
+    high = df["High"].astype(float)
+    low = df["Low"].astype(float)
+    prev_close = df["Close"].astype(float).shift(1)
+    tr = pd.concat([high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+    return tr.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
 
 
 def support_resistance(df: pd.DataFrame, lookback: int = 30) -> dict:
@@ -46,6 +71,14 @@ def support_resistance(df: pd.DataFrame, lookback: int = 30) -> dict:
         "support": float(recent["Low"].min()),
         "resistance": float(recent["High"].max()),
     }
+
+
+def _last(s: pd.Series) -> float | None:
+    """Latest value as a float, or None when the series is empty or still warming up (NaN)."""
+    if not len(s):
+        return None
+    v = float(s.iloc[-1])
+    return None if math.isnan(v) else v
 
 
 def compute_all(df: pd.DataFrame) -> dict:
@@ -61,14 +94,12 @@ def compute_all(df: pd.DataFrame) -> dict:
     bb = bollinger(close)
     sr = support_resistance(df)
 
-    last = lambda s: float(s.iloc[-1]) if len(s) else None
-
-    latest_close = last(close)
-    latest_sma20 = last(sma20)
-    latest_sma50 = last(sma50)
-    latest_rsi = last(rsi14)
-    latest_macd = last(macd_d["macd"])
-    latest_signal = last(macd_d["signal"])
+    latest_close = _last(close)
+    latest_sma20 = _last(sma20)
+    latest_sma50 = _last(sma50)
+    latest_rsi = _last(rsi14)
+    latest_macd = _last(macd_d["macd"])
+    latest_signal = _last(macd_d["signal"])
 
     # Score-based signal
     score = 0
@@ -101,8 +132,8 @@ def compute_all(df: pd.DataFrame) -> dict:
         "rsi": latest_rsi,
         "macd": latest_macd,
         "macd_signal": latest_signal,
-        "bb_upper": last(bb["upper"]),
-        "bb_lower": last(bb["lower"]),
+        "bb_upper": _last(bb["upper"]),
+        "bb_lower": _last(bb["lower"]),
         "support": sr["support"],
         "resistance": sr["resistance"],
         "verdict": verdict,
