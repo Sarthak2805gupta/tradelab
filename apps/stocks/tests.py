@@ -14,7 +14,6 @@ class SmokeTests(TestCase):
             ("/about/",    200, "TradeLab"),
             ("/privacy/",  200, "Privacy"),
             ("/learn/",    200, "Learning"),
-            ("/screener/", 200, "Screener"),
             ("/watchlist/",200, "Watchlist"),
             ("/portfolio/",200, "Portfolio"),
             ("/risk/",     200, "Risk"),

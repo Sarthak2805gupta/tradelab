@@ -47,8 +47,6 @@
 
 import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
 import sys
 import warnings
@@ -1472,6 +1470,9 @@ def plot_all(df, ticker, all_signals):
         4. CCI + ROC
         5. Volume + ATR
     """
+    # matplotlib is only needed for this CLI chart; imported lazily so the web app never loads it.
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
     fig = plt.figure(figsize=(16, 14))
     gs  = gridspec.GridSpec(5, 1,
                             height_ratios=[4, 1.5, 1.5, 1.5, 1.5],
