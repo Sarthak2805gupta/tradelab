@@ -4,6 +4,9 @@ on:
   schedule:
     # Every 10 minutes — comfortably under Render free tier's 15-minute
     # idle-spindown window, so the app should never cold-start for a user.
+    # (GitHub may delay scheduled runs by several minutes under load; an
+    # external uptime pinger such as cron-job.org or UptimeRobot is more
+    # punctual if cold starts are still seen.)
     - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
@@ -13,6 +16,8 @@ jobs:
     steps:
       - name: Ping TradeLab
         run: |
+          # The dashboard request also kicks the in-process cache warmer, so
+          # one ping keeps both the dyno and the quote caches alive.
           code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://tradelab-cdzs.onrender.com/)
           echo "Response: $code"
           if [ "$code" -ge 500 ]; then

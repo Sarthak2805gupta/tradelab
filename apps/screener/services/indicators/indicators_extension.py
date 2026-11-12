@@ -47,8 +47,6 @@
 
 import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
 import sys
 import warnings
@@ -1509,6 +1507,9 @@ def plot_extension_chart(df, ticker):
         3. Awesome Oscillator + Momentum
         4. CMF + Historical Volatility
     """
+    # matplotlib is only needed for this CLI chart; imported lazily so the web app never loads it.
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
     # Calculate all series
     tenkan, kijun, senkou_a, senkou_b, chikou = calc_ichimoku(df)
     sar, trend = calc_parabolic_sar(df)

@@ -17,8 +17,10 @@ def _user_filter(request):
 def _enrich(rows):
     out = []
     total_invested = total_current = Decimal("0")
+    rows = list(rows)
+    quotes = fetcher.fetch_quotes([r.ticker for r in rows])
     for r in rows:
-        q = fetcher.fetch_quote(r.ticker)
+        q = quotes.get(r.ticker)
         price = Decimal(str(q["price"])) if q else r.buy_price
         invested = r.buy_price * r.quantity
         current = price * r.quantity

@@ -14,6 +14,10 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from django.core.cache import cache as _cache
+
+from .fetcher import get_info, INFO_TTL_SECONDS
+
 try:
     import yfinance as yf
 except Exception:  # pragma: no cover
@@ -122,11 +126,18 @@ def get_company_profile(ticker: str) -> dict | None:
     """
     if yf is None:
         return None
-    try:
-        t = yf.Ticker(ticker)
-        info = t.info or {}
-    except Exception:
-        return None
+    key = f"profile:{ticker}"
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached or None  # {} marks "no profile" (ETF/index) so we don't re-ask
+    profile = _build_company_profile(ticker)
+    _cache.set(key, profile or {}, INFO_TTL_SECONDS)
+    return profile
+
+
+def _build_company_profile(ticker: str) -> dict | None:
+    info = get_info(ticker)
+    t = yf.Ticker(ticker)
 
     summary = info.get("longBusinessSummary")
     if not summary:
@@ -227,12 +238,21 @@ def get_company_profile(ticker: str) -> dict | None:
 def get_financials(ticker: str) -> dict | None:
     if yf is None:
         return None
+    key = f"financials:{ticker}"
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached or None  # {} marks "no income statement" (ETF/index)
+    fin = _build_financials(ticker)
+    _cache.set(key, fin or {}, INFO_TTL_SECONDS)
+    return fin
+
+
+def _build_financials(ticker: str) -> dict | None:
     try:
-        t = yf.Ticker(ticker)
-        qdf = t.quarterly_income_stmt
-        info = t.info or {}
+        qdf = yf.Ticker(ticker).quarterly_income_stmt
     except Exception:
         return None
+    info = get_info(ticker)
     if qdf is None or qdf.empty:
         return None
 
@@ -274,12 +294,18 @@ def get_financials(ticker: str) -> dict | None:
 
     # Latest quarter snapshot
     latest = history[0]
-    # Y/Y comparison: latest vs the quarter ~4 steps back (same quarter prev year).
-    yoy_index = 4 if len(history) > 4 else len(history) - 1
-    yoy = history[yoy_index] if len(history) > 1 else latest
-    yoy_revenue_pct = _pct(latest["revenue"], yoy["revenue"]) if yoy is not latest else None
-    yoy_profit_pct = _pct(latest["net_income"], yoy["net_income"]) if yoy is not latest else None
-    yoy_eps_pct = _pct(latest["eps"], yoy["eps"]) if (yoy is not latest and latest["eps"] and yoy["eps"]) else None
+    # Y/Y comparison: latest vs the same quarter one year earlier (4 steps back).
+    # Accuracy: with fewer than 5 quarters there is no true year-ago quarter;
+    # the old code silently compared against whatever the oldest quarter was
+    # (e.g. 2 quarters back) and still labelled it "Y/Y". Now it's None, and
+    # the rating treats growth as "data incomplete" instead of guessing.
+    if len(history) > 4:
+        yoy = history[4]
+        yoy_revenue_pct = _pct(latest["revenue"], yoy["revenue"])
+        yoy_profit_pct = _pct(latest["net_income"], yoy["net_income"])
+        yoy_eps_pct = _pct(latest["eps"], yoy["eps"]) if (latest["eps"] and yoy["eps"]) else None
+    else:
+        yoy_revenue_pct = yoy_profit_pct = yoy_eps_pct = None
 
     # Q/Q (just previous quarter)
     prev = history[1] if len(history) > 1 else None
@@ -300,7 +326,8 @@ def get_financials(ticker: str) -> dict | None:
         "financial_currency": fin_ccy,
     }
 
-    strengths, concerns = _assess(snapshot, latest, yoy_revenue_pct, yoy_profit_pct)
+    strengths, concerns = _assess(snapshot, latest, yoy_revenue_pct, yoy_profit_pct,
+                                  sector=info.get("sector"))
 
     return {
         "available": True,
@@ -316,10 +343,17 @@ def get_financials(ticker: str) -> dict | None:
     }
 
 
-def _assess(snap: dict, latest: dict, yoy_rev: float | None, yoy_profit: float | None):
+# Sectors where debt is the raw material of the business (banks, NBFCs,
+# insurers): a high debt/equity ratio is structural, not a warning sign.
+LEVERAGE_NEUTRAL_SECTORS = {"financial services"}
+
+
+def _assess(snap: dict, latest: dict, yoy_rev: float | None, yoy_profit: float | None,
+            sector: str | None = None):
     """Produce plain-English strength/concern bullets about the company's fundamentals."""
     strengths = []
     concerns = []
+    sector_key = (sector or "").strip().lower()
 
     # Revenue growth
     if yoy_rev is not None:
@@ -414,9 +448,11 @@ def _assess(snap: dict, latest: dict, yoy_rev: float | None, yoy_profit: float |
         elif roe_pct > 0:
             concerns.append(f"Return on equity is only {roe_pct:.1f}% — capital isn't working hard enough.")
 
-    # Debt / equity
+    # Debt / equity — skipped for banks/NBFCs, whose balance sheets are
+    # leveraged by design (deposits and borrowings fund the loan book), so
+    # the generic "high leverage" warning would fire on every bank.
     de = snap.get("debt_to_equity")
-    if _is_finite_number(de):
+    if _is_finite_number(de) and sector_key not in LEVERAGE_NEUTRAL_SECTORS:
         # yfinance returns this as a number like 35.6 meaning 35.6% or 0.356 ratio depending on version
         # Normalise: if >5 assume it's a percent
         de_ratio = de / 100.0 if de > 5 else de

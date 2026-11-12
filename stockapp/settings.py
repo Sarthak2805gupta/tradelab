@@ -129,6 +129,9 @@ if DB_ENGINE == "django.db.backends.sqlite3":
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+            # The dashboard writes the price cache from several threads at
+            # once; wait for the lock instead of failing with "database is locked".
+            "OPTIONS": {"timeout": 20},
         }
     }
 else:
@@ -140,9 +143,34 @@ else:
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "3306"),
-            "OPTIONS": {"charset": "utf8mb4"},
+            # Reuse DB connections across requests (a new TCP+TLS handshake to a
+            # hosted database costs 50-100 ms per request otherwise).
+            "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
+            "CONN_HEALTH_CHECKS": True,
         }
     }
+    if DB_ENGINE == "django.db.backends.mysql":
+        DATABASES["default"]["OPTIONS"] = {"charset": "utf8mb4"}
+
+# Shared cache for price history, fundamentals and analysis reports.
+#   db     — persists across restarts and is shared by all gunicorn workers
+#            (run `manage.py createcachetable`; the Procfile release step does).
+#   locmem — per-process, lost on restart; fine for a quick local trial.
+CACHE_BACKEND = os.getenv("CACHE_BACKEND", "db")
+if CACHE_BACKEND == "locmem":
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "tradelab_cache",
+            "OPTIONS": {"MAX_ENTRIES": 5000, "CULL_FREQUENCY": 4},
+        }
+    }
+
+# Keep the dashboard universe warm from a background thread while the
+# process is alive, so visitors never wait on a cold Yahoo fetch.
+PREWARM_IN_PROCESS = os.getenv("PREWARM_IN_PROCESS", "true").lower() == "true"
 
 AUTH_PASSWORD_VALIDATORS = []
 

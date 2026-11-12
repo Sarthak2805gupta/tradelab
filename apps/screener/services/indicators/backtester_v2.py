@@ -28,8 +28,6 @@
 
 import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
 import sys
 import os
@@ -702,6 +700,9 @@ def calculate_metrics(trades, equity_curve, capital, strategy_name):
 
 def plot_results(equity_curves, metrics_list, ticker, capital):
     """Results dashboard for all 6 strategies."""
+    # matplotlib is only needed for this CLI chart; imported lazily so the web app never loads it.
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
 
     fig = plt.figure(figsize=(16, 12))
     gs  = gridspec.GridSpec(2, 2, hspace=0.4, wspace=0.35)
