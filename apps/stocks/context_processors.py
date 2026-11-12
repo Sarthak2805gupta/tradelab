@@ -7,7 +7,7 @@ Global context processors:
 from datetime import time as dtime
 from django.utils import timezone
 
-from apps.stocks.views import SEARCH_UNIVERSE
+from apps.stocks.services.universe import SEARCH_UNIVERSE
 
 
 def search_universe(request):
