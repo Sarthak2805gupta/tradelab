@@ -10,6 +10,8 @@ slimmed down: static universes, the news feed, the what-if and SIP
 calculators now live in `apps/stocks/services/*` and the views only parse
 input, call a service and render. Output and page design are unchanged.
 """
+from __future__ import annotations
+
 from datetime import time
 from decimal import Decimal
 
