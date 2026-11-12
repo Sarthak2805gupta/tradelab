@@ -112,21 +112,19 @@ DASHBOARD_COMMODITY_ETFS = [
 
 
 def _dashboard_commodities():
-    # Parallel quotes — each fetch_quote is a network call; run concurrently.
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=len(DASHBOARD_COMMODITY_ETFS)) as pool:
-        quotes = list(pool.map(lambda c: fetcher.fetch_quote(c["ticker"]), DASHBOARD_COMMODITY_ETFS))
-    return [{**c, "quote": q} for c, q in zip(DASHBOARD_COMMODITY_ETFS, quotes)]
+    quotes = fetcher.fetch_quotes([c["ticker"] for c in DASHBOARD_COMMODITY_ETFS])
+    return [{**c, "quote": quotes.get(c["ticker"])} for c in DASHBOARD_COMMODITY_ETFS]
 
 
 def _portfolio_summary(user) -> dict | None:
     """Invested / current / P&L totals for the signed-in user's holdings."""
     from apps.portfolio.models import UserPortfolio
-    rows = UserPortfolio.objects.filter(user=user)
+    rows = list(UserPortfolio.objects.filter(user=user))
+    quotes = fetcher.fetch_quotes([r.ticker for r in rows])
     invested = current = Decimal("0")
     for r in rows:
         invested += r.buy_price * r.quantity
-        q = fetcher.fetch_quote(r.ticker)
+        q = quotes.get(r.ticker)
         price = Decimal(str(q["price"])) if q else r.buy_price
         current += price * r.quantity
     return {
@@ -137,8 +135,11 @@ def _portfolio_summary(user) -> dict | None:
 
 
 def dashboard(request):
+    # Keep the dashboard universe warm in the background from now on.
+    fetcher.ensure_warm_loop(extra=[c["ticker"] for c in DASHBOARD_COMMODITY_ETFS])
     # Parallelise the three slow-ish network fetches that make up the top of
-    # the dashboard (indices, movers, commodity ETFs).
+    # the dashboard (indices, movers, commodity ETFs). Each is bounded by the
+    # fetcher's deadline, so a cold cache costs a few seconds at most.
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=3) as pool:
         f_idx = pool.submit(fetcher.fetch_indices)
@@ -437,12 +438,8 @@ def live_view(request):
     except Exception:
         indices = []
 
-    # Watchlist
-    watchlist_quotes = []
-    for t in _session_watchlist(request)[:8]:
-        q = fetcher.fetch_quote(t)
-        if q:
-            watchlist_quotes.append(q)
+    # Watchlist (one DB query for all tickers, misses fetched in parallel)
+    watchlist_quotes = [q for q in fetcher.fetch_quotes(_session_watchlist(request)[:8]).values() if q]
 
     # Intraday verdict — uses quote only (instant). History-based signals
     # (SMA5/SMA20) are added only if bars happen to be cached already.
@@ -585,9 +582,5 @@ def watchlist_remove(request, ticker: str):
 
 def api_watchlist_quotes(request):
     """Returns live quotes for the user's watchlist — polled every 60s."""
-    out = []
-    for t in _session_watchlist(request):
-        q = fetcher.fetch_quote(t)
-        if q:
-            out.append(q)
+    out = [q for q in fetcher.fetch_quotes(_session_watchlist(request)).values() if q]
     return JsonResponse({"quotes": out})

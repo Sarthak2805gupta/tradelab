@@ -19,10 +19,39 @@ def _history_df(ticker: str) -> pd.DataFrame:
     return df
 
 
+REPORT_CACHE_SECONDS = 300  # a full report is reused for 5 minutes
+
+
 def analyze(ticker: str) -> dict:
-    quote = fetch_quote(ticker)
-    fundamentals = fetch_fundamentals(ticker)
-    df = _history_df(ticker)
+    """
+    Build the full report. The quote/history, fundamentals (Ticker.info),
+    quarterly financials and company profile are independent network calls,
+    so they run in parallel instead of one after another; the finished
+    report is cached for 5 minutes so repeat views cost no network at all.
+    """
+    from django.core.cache import cache as _cache
+    key = f"report:{ticker}"
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached
+    report = _analyze_uncached(ticker)
+    if report.get("ok"):
+        _cache.set(key, report, REPORT_CACHE_SECONDS)
+    return report
+
+
+def _analyze_uncached(ticker: str) -> dict:
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        f_quote = pool.submit(fetch_quote, ticker)
+        f_fund = pool.submit(fetch_fundamentals, ticker)
+        f_fin = pool.submit(financials_svc.get_financials, ticker)
+        f_prof = pool.submit(financials_svc.get_company_profile, ticker)
+        quote = f_quote.result()
+        df = _history_df(ticker)  # served from the cache the quote fetch just filled
+        fundamentals = f_fund.result()
+        financials_block = f_fin.result()
+        company_profile = f_prof.result()
 
     if df.empty or quote is None:
         return {
@@ -112,8 +141,6 @@ def analyze(ticker: str) -> dict:
 
     confidence = min(100, abs(ind.get("score", 0)) * 25 + 25)
 
-    financials_block = financials_svc.get_financials(ticker)
-    company_profile = financials_svc.get_company_profile(ticker)
     buy_rating = _compute_buy_rating(ind, financials_block, rsi_v, fundamentals=fundamentals)
 
     return {

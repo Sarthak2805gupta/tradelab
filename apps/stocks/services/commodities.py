@@ -174,21 +174,21 @@ def get_spec(key: str) -> dict | None:
 
 def list_commodities() -> list[dict]:
     """Light listing for the index page — name, emoji, latest price for each instrument."""
-    jobs = {}
+    from .fetcher import fetch_quotes
+    tickers = []
     for spec in COMMODITIES:
         if spec["etf"]:
-            jobs[f"{spec['key']}__etf"] = lambda t=spec["etf"]["ticker"]: fetch_quote(t)
+            tickers.append(spec["etf"]["ticker"])
         if spec["futures"]:
-            jobs[f"{spec['key']}__fut"] = lambda t=spec["futures"]["ticker"]: fetch_quote(t)
-
-    quotes = _parallel_fetch(jobs)
+            tickers.append(spec["futures"]["ticker"])
+    quotes = fetch_quotes(tickers)  # one DB query; cold misses fetched in parallel with a deadline
 
     out = []
     for spec in COMMODITIES:
         out.append({
             "spec": spec,
-            "etf_quote": quotes.get(f"{spec['key']}__etf"),
-            "fut_quote": quotes.get(f"{spec['key']}__fut"),
+            "etf_quote": quotes.get(spec["etf"]["ticker"]) if spec["etf"] else None,
+            "fut_quote": quotes.get(spec["futures"]["ticker"]) if spec["futures"] else None,
         })
     return out
 

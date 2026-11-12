@@ -14,6 +14,10 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from django.core.cache import cache as _cache
+
+from .fetcher import get_info, INFO_TTL_SECONDS
+
 try:
     import yfinance as yf
 except Exception:  # pragma: no cover
@@ -122,11 +126,18 @@ def get_company_profile(ticker: str) -> dict | None:
     """
     if yf is None:
         return None
-    try:
-        t = yf.Ticker(ticker)
-        info = t.info or {}
-    except Exception:
-        return None
+    key = f"profile:{ticker}"
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached or None  # {} marks "no profile" (ETF/index) so we don't re-ask
+    profile = _build_company_profile(ticker)
+    _cache.set(key, profile or {}, INFO_TTL_SECONDS)
+    return profile
+
+
+def _build_company_profile(ticker: str) -> dict | None:
+    info = get_info(ticker)
+    t = yf.Ticker(ticker)
 
     summary = info.get("longBusinessSummary")
     if not summary:
@@ -227,12 +238,21 @@ def get_company_profile(ticker: str) -> dict | None:
 def get_financials(ticker: str) -> dict | None:
     if yf is None:
         return None
+    key = f"financials:{ticker}"
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached or None  # {} marks "no income statement" (ETF/index)
+    fin = _build_financials(ticker)
+    _cache.set(key, fin or {}, INFO_TTL_SECONDS)
+    return fin
+
+
+def _build_financials(ticker: str) -> dict | None:
     try:
-        t = yf.Ticker(ticker)
-        qdf = t.quarterly_income_stmt
-        info = t.info or {}
+        qdf = yf.Ticker(ticker).quarterly_income_stmt
     except Exception:
         return None
+    info = get_info(ticker)
     if qdf is None or qdf.empty:
         return None
 
